@@ -1,0 +1,1149 @@
+{% extends 'base.html' %}
+
+{% block title %}專案進度表{% endblock %}
+
+{% block content %}
+<div class="layout-container flex h-screen grow flex-col bg-slate-50 overflow-hidden">
+    <header
+        class="flex flex-wrap items-center justify-between gap-4 border-b border-solid border-slate-200 bg-white px-4 sm:px-6 py-3 shrink-0 w-full overflow-x-auto">
+        <a href="{{ url_for('index') }}" class="flex items-center gap-3 sm:gap-4 text-slate-900 hover:opacity-80 transition-opacity">
+            <div class="size-6 text-primary">
+                <span class="material-symbols-outlined text-[24px]">view_kanban</span>
+            </div>
+            <h2 class="text-slate-900 text-base sm:text-lg font-bold leading-tight">專案進度表</h2>
+        </a>
+        <div class="flex items-center gap-4 sm:gap-9 overflow-x-auto pb-1 sm:pb-0 hide-scrollbar">
+            <a href="{{ url_for('index') }}"
+                class="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors whitespace-nowrap">首頁</a>
+            <a href="{{ url_for('employee_case') }}"
+                class="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors whitespace-nowrap">員工進度表</a>
+            <a href="{{ url_for('proj_timeline') }}"
+                class="text-slate-900 text-sm font-medium border-b-2 border-primary sm:pb-1 sm:-mb-[14px] whitespace-nowrap">專案進度表</a>
+        </div>
+    </header>
+
+    <div class="flex flex-col xl:flex-row xl:items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-white z-10 shrink-0 gap-4">
+        <div class="flex items-center gap-4 sm:gap-6 border-b xl:border-b-0 border-slate-200 pb-2 xl:pb-0 overflow-x-auto hide-scrollbar">
+            <button id="btn-table" onclick="switchTab('table')"
+                class="flex items-center gap-1 sm:gap-2 xl:pb-2 text-sm font-bold text-primary border-b-2 border-primary xl:-mb-[9px] transition-colors whitespace-nowrap">
+                <span class="material-symbols-outlined text-[16px] sm:text-[18px]">table_chart</span> 專案表格
+            </button>
+            <button id="btn-timeline" onclick="switchTab('timeline')"
+                class="flex items-center gap-1 sm:gap-2 xl:pb-2 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent xl:-mb-[9px] transition-colors whitespace-nowrap">
+                <span class="material-symbols-outlined text-[16px] sm:text-[18px]">timeline</span> 時間軸
+            </button>
+            
+            <button id="btn-add-col" onclick="addCustomColumn()" class="ml-2 flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 transition-colors bg-slate-100 hover:bg-blue-50 px-2 py-1 rounded whitespace-nowrap shrink-0">
+                <span class="material-symbols-outlined text-[14px]">view_column</span> 新增自訂欄位
+            </button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <!-- Keyword search -->
+            <div class="flex items-center relative flex-1 min-w-[120px]">
+                <span class="material-symbols-outlined absolute left-2 text-[18px] text-slate-400">search</span>
+                <input type="text" id="filter-keyword" oninput="applyDateFilter()" placeholder="搜尋專案..." class="form-input w-full rounded-lg border-slate-300 bg-white h-8 pl-8 pr-2 text-xs shadow-sm">
+            </div>
+
+            <!-- Month range filter (shared between table & timeline) -->
+            <div class="flex items-center gap-1 sm:gap-2" id="date-range-filter">
+                <span class="material-symbols-outlined text-[18px] text-slate-400">date_range</span>
+                <input type="month" id="filter-start" onchange="applyDateFilter()"
+                    class="form-input rounded-lg border-slate-300 bg-white h-8 px-1 sm:px-2 text-xs shadow-sm w-[100px] sm:w-[130px]"
+                    title="起始月份">
+                <span class="text-slate-400 text-xs">~</span>
+                <input type="month" id="filter-end" onchange="applyDateFilter()"
+                    class="form-input rounded-lg border-slate-300 bg-white h-8 px-1 sm:px-2 text-xs shadow-sm w-[100px] sm:w-[130px]"
+                    title="結束月份">
+                <button onclick="resetDateFilter()"
+                    class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors shrink-0"
+                    title="清除篩選">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                </button>
+            </div>
+
+            <div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 shadow-sm border border-slate-200 dark:border-slate-700 hidden shrink-0"
+                id="zoom-controls">
+                <button onclick="zoomTimeline(-0.2)"
+                    class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded transition-colors"
+                    title="縮小">
+                    <span class="material-symbols-outlined text-[18px]">zoom_out</span>
+                </button>
+                <span class="text-xs font-medium text-slate-500 px-2" id="zoom-level">100%</span>
+                <button onclick="zoomTimeline(0.2)"
+                    class="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-white rounded transition-colors"
+                    title="放大">
+                    <span class="material-symbols-outlined text-[18px]">zoom_in</span>
+                </button>
+                <button onclick="resetZoom()"
+                    class="px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-white rounded transition-colors ml-1 border-l border-slate-200"
+                    title="重設為100%">
+                    100%
+                </button>
+                <button onclick="scrollToTodayOnly()"
+                    class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded transition-colors ml-1 border-l border-slate-200"
+                    title="回到今天">
+                    <span class="material-symbols-outlined text-[18px]">today</span>
+                </button>
+                <button onclick="showAllProjects()"
+                    class="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-white rounded transition-colors ml-1 border-l border-slate-200"
+                    title="顯示全部專案">
+                    <span class="material-symbols-outlined text-[18px]">fit_screen</span>
+                </button>
+            </div>
+
+            <a href="{{ url_for('add_proj') }}"
+                class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-colors shadow-sm flex items-center justify-center gap-1 sm:gap-2 shrink-0">
+                <span class="material-symbols-outlined text-[16px] sm:text-[18px]">add</span><span class="hidden sm:inline">新增專案</span><span class="sm:hidden">新增</span>
+            </a>
+        </div>
+    </div>
+
+    <style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+
+    <!-- show flash messages (auto-dismiss) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="px-6 py-2" id="flash-container">
+        {% for category, message in messages %}
+        <div
+            class="flash-msg p-4 rounded-lg shadow-sm text-sm font-medium transition-all duration-500 {% if category == 'success' %}bg-green-100 text-green-700 border border-green-200{% else %}bg-red-100 text-red-700 border border-red-200{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    <script>
+        setTimeout(function () {
+            var msgs = document.querySelectorAll('.flash-msg');
+            msgs.forEach(function (m) {
+                m.style.opacity = '0';
+                m.style.transform = 'translateY(-10px)';
+            });
+            setTimeout(function () {
+                var c = document.getElementById('flash-container');
+                if (c) c.remove();
+            }, 500);
+        }, 3000);
+    </script>
+    {% endif %}
+    {% endwith %}
+
+    <!-- show table and timeline -->
+    <div class="flex-1 relative overflow-hidden flex flex-col">
+
+        <div id="view-table" class="flex-1 overflow-auto bg-white p-6 flex flex-col">
+            <div class="border border-slate-200 rounded-lg shadow-sm overflow-hidden flex-1">
+                <div class="overflow-x-auto h-full">
+                    <table class="w-full text-left whitespace-nowrap border-collapse" id="project-table">
+                        <thead id="project-thead">
+                            <tr class="bg-slate-50 border-y border-slate-200">
+                                <th class="px-4 py-3 min-w-[250px] border-r border-slate-200" data-col-id="col-name">專案名稱</th>
+                                <th class="px-4 py-3 min-w-[200px] border-r border-slate-200" data-col-id="col-period">專案期間</th>
+                                <th class="px-4 py-3 border-r border-slate-200" data-col-id="col-status">狀態</th>
+                                <th class="px-4 py-3 border-r border-slate-200" data-col-id="col-rep">業務代表</th>
+                                <th class="px-4 py-3 border-r border-slate-200" data-col-id="col-equip">設備</th>
+                                <th class="px-4 py-3 min-w-[200px] border-r border-slate-200" data-col-id="col-personnel">人員名單</th>
+                                <th class="px-4 py-3 min-w-[250px] border-r border-slate-200" data-col-id="col-desc">內容敘述</th>
+                                <th class="px-4 py-3 min-w-[350px]" data-col-id="col-notes">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-sm text-slate-700" id="project-tbody">
+                            {% for proj in projects %}
+                            <tr class="hover:bg-slate-50 transition-colors align-top group project-row"
+                                data-id="{{ proj.id }}"
+                                data-start="{{ proj.start_date.strftime('%Y-%m-%d') }}"
+                                data-end="{{ proj.end_date.strftime('%Y-%m-%d') if proj.end_date else '' }}"
+                                data-rep="{{ proj.rep }}"
+                                data-status="{{ proj.status }}"
+                                data-name="{{ proj.name | lower }}"
+                                data-personnel="{% for task in proj.tasks %}{{ task.personnel }},{% endfor %}">
+                                <td class="px-4 py-3 font-medium text-slate-900" data-col-id="col-name">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <span class="mt-1">{{ proj.name }}</span>
+                                        <div
+                                            class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                            <a href="{{ url_for('edit_project', id=proj.id) }}"
+                                                class="text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors"
+                                                title="修改專案">
+                                                <span class="material-symbols-outlined text-[18px]">edit</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-slate-500" data-col-id="col-period">
+                                    {{ proj.start_date.strftime('%Y/%m/%d') }}
+                                    {% if proj.end_date %} - {{ proj.end_date.strftime('%Y/%m/%d') }}{% endif %}
+                                </td>
+                                <td class="px-4 py-3" data-col-id="col-status">
+                                    {% if proj.status == '進行中' %}
+                                    <span
+                                        class="px-2 py-1 bg-amber-100 text-amber-800 rounded font-medium text-xs">進行中</span>
+                                    {% elif proj.status == '暫緩中' %}
+                                    <span
+                                        class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium text-xs">暫緩中</span>
+                                    {% elif proj.status == '等待中' %}
+                                    <span
+                                        class="px-2 py-1 bg-pink-100 text-pink-800 rounded font-medium text-xs">等待中</span>
+                                    {% elif proj.status == '已結案' %}
+                                    <span
+                                        class="px-2 py-1 bg-green-100 text-green-800 rounded font-medium text-xs">已結案</span>
+                                    {% else %}
+                                    <span class="px-2 py-1 bg-slate-100 text-slate-800 rounded font-medium text-xs">{{
+                                        proj.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3" data-col-id="col-rep">{{ proj.rep }}</td>
+                                <td class="px-4 py-3" data-col-id="col-equip">{{ proj.equipment if proj.equipment else '' }}</td>
+                                <td class="px-4 py-3 text-slate-600" data-col-id="col-personnel">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% set task_users = [] %}
+                                        {% for task in proj.tasks %}
+                                        {% if task.personnel not in task_users %}
+                                        {% set _ = task_users.append(task.personnel) %}
+                                        <span class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">{{ task.personnel }}</span>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-slate-600 whitespace-pre-wrap text-[13px] leading-relaxed" data-col-id="col-desc">{{ proj.description if proj.description else '' }}</td>
+                                <td class="px-4 py-3 text-slate-500 whitespace-pre-wrap text-[13px] leading-relaxed" data-col-id="col-notes">{{ proj.notes if proj.notes else '' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="px-4 py-8 text-center text-slate-500">目前還沒有專案紀錄。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="view-timeline" class="hidden flex-1 overflow-auto bg-white relative">
+            <div class="inline-block min-w-full align-middle">
+                <!-- Timeline header - dynamically generated -->
+                <div class="flex sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm min-w-max">
+                    <div
+                        class="sticky left-0 z-40 w-[150px] sm:w-[200px] lg:w-[300px] shrink-0 bg-white border-r border-slate-200 px-3 sm:px-5 py-3 flex items-center shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                        <span class="font-bold text-slate-700 text-xs sm:text-sm">專案名稱</span>
+                    </div>
+                    <div id="timeline-container"
+                        class="flex flex-1 relative text-center origin-left">
+                    </div>
+                </div>
+
+                <div class="flex flex-col min-w-max pb-20 pt-1" id="timeline-rows">
+                    {% for item in timeline_data %}
+                    <div class="flex border-b border-slate-100 hover:bg-slate-50 transition-colors group timeline-project-row"
+                        data-start="{{ item.proj.start_date.strftime('%Y-%m-%d') }}"
+                        data-end="{{ item.proj.end_date.strftime('%Y-%m-%d') if item.proj.end_date else '' }}"
+                        data-rep="{{ item.proj.rep }}"
+                        data-status="{{ item.proj.status }}"
+                        data-name="{{ item.proj.name | lower }}"
+                        data-personnel="{% for task in item.proj.tasks %}{{ task.personnel }},{% endfor %}"
+                        data-orig-left="{{ item.left }}"
+                        data-orig-width="{{ item.width }}">
+                        <div
+                            class="sticky left-0 z-20 w-[150px] sm:w-[200px] lg:w-[300px] shrink-0 bg-white group-hover:bg-slate-50 border-r border-slate-200 px-3 sm:px-5 flex items-center h-[60px] shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                            <span class="text-xs sm:text-sm font-medium text-slate-800 truncate" title="{{ item.proj.name }}">{{
+                                item.proj.name }}</span>
+                        </div>
+
+                        <div
+                            class="timeline-row-content relative flex-1 h-[60px] origin-left">
+                            <div class="timeline-grid absolute inset-0 flex pointer-events-none z-0">
+                            </div>
+
+                            <!-- Today red line -->
+                            <div class="today-line absolute top-0 bottom-0 z-[5] pointer-events-none"
+                                style="left: {{ today_pct }}%;">
+                                <div class="w-[2px] h-full bg-red-500"></div>
+                            </div>
+
+                            <!-- Main project background -->
+                            <div class="timeline-bar absolute h-[36px] mt-[12px] bg-slate-100/80 rounded-md shadow-sm flex items-center border border-slate-300 z-0 overflow-hidden"
+                                style="left: {{ item.left }}%; width: {{ item.width }}%; min-width: 250px;">
+                                <div class="bar-text flex items-center px-3 gap-3 h-full whitespace-nowrap opacity-60 pointer-events-none">
+                                    <span class="text-[13px] font-semibold text-slate-700">{{ item.proj.name }}</span>
+                                    <span
+                                        class="{{ item.tag_class }} text-white text-[11px] px-1.5 py-0.5 rounded font-medium">{{
+                                        item.proj.status }}</span>
+                                    <span class="text-slate-500 text-[12px]">{{ item.proj.rep }}</span>
+                                    <span class="text-slate-400 text-[12px]">{{ item.proj.description if item.proj.description else '' }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Task segments (Solid bars) -->
+                            {% for seg in item.segments %}
+                            <div class="timeline-bar absolute h-[24px] mt-[18px] bg-primary rounded shadow-sm flex items-center hover:bg-blue-600 border border-blue-700 z-10 overflow-hidden cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
+                                style="left: {{ seg.left }}%; width: {{ seg.width }}%; min-width: 40px;" title="{{ seg.personnel }} - {{ seg.work_days }} 天&#10;{{ seg.desc if seg.desc else '' }}">
+                                <div class="bar-text flex items-center px-1.5 h-full whitespace-nowrap w-full justify-center">
+                                    <span class="text-[10px] font-bold text-white truncate drop-shadow-md">{{ seg.personnel }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="flex border-b border-slate-100 items-center justify-center h-[100px]">
+                        <span class="text-slate-500 text-sm">目前還沒有專案紀錄。</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Column Modal -->
+        <div id="custom-col-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden items-center justify-center">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-4">新增自訂欄位</h3>
+                <label class="block text-sm font-medium text-slate-700 mb-1">自訂欄位名稱</label>
+                <input type="text" id="custom-col-input" class="form-input w-full rounded-lg border-slate-300 mb-4 px-3 py-2" placeholder="例如：採購進度" onkeydown="if(event.key === 'Enter') submitCustomColumn()">
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeCustomColModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">取消</button>
+                    <button onclick="submitCustomColumn()" class="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-sm transition-colors">確定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Confirm Modal -->
+        <div id="custom-confirm-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden items-center justify-center">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6">
+                <h3 class="text-lg font-bold text-slate-900 mb-2">確認刪除</h3>
+                <p id="custom-confirm-msg" class="text-sm text-slate-600 mb-6"></p>
+                <div class="flex justify-end gap-3">
+                    <button onclick="closeCustomConfirmModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">取消</button>
+                    <button id="custom-confirm-btn" class="px-4 py-2 text-sm font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg shadow-sm transition-colors">確定刪除</button>
+                </div>
+            </div>
+        </div>
+        {% endblock %}
+        {% block scripts %}
+        <script>
+            // =============================================
+            // Data from server
+            // =============================================
+            const ORIG_TIMELINE_START = new Date('{{ timeline_start.isoformat() }}');
+            const ORIG_TIMELINE_END = new Date('{{ timeline_end.isoformat() }}');
+            const ORIG_TODAY_PCT = {{ today_pct }};
+            const DEFAULT_LEFT_PCT = {{ default_left_pct }};
+            const DEFAULT_WIDTH_PCT = {{ default_width_pct }};
+            const BASE_MIN_WIDTH = 1200;
+            const FULL_WIDTH_AT_100 = Math.round(BASE_MIN_WIDTH / (DEFAULT_WIDTH_PCT / 100));
+
+            // Active (possibly filtered) timeline range
+            let TIMELINE_START = new Date(ORIG_TIMELINE_START);
+            let TIMELINE_END = new Date(ORIG_TIMELINE_END);
+            let TODAY_PCT = ORIG_TODAY_PCT;
+            const LEFT_COL_WIDTH = 300;
+
+            let currentScale = 1.0;
+            let currentTab = 'table';
+
+            // =============================================
+            // Custom Columns (localStorage)
+            // =============================================
+            let customColumns = [];
+            let customData = {};
+            
+            try {
+                const storedCols = localStorage.getItem('proj_custom_columns');
+                if (storedCols) customColumns = JSON.parse(storedCols);
+                if (!Array.isArray(customColumns)) customColumns = [];
+            } catch(e) {
+                console.error('Error parsing custom columns:', e);
+                customColumns = [];
+            }
+
+            try {
+                const storedData = localStorage.getItem('proj_custom_data');
+                if (storedData) customData = JSON.parse(storedData);
+                if (!customData || typeof customData !== 'object') customData = {};
+            } catch(e) {
+                console.error('Error parsing custom data:', e);
+                customData = {};
+            }
+
+            function renderCustomColumns() {
+                const theadTr = document.querySelector('#project-table thead tr');
+                const tbodyTrs = document.querySelectorAll('#project-table tbody tr.project-row');
+
+                // Clear existing custom columns from DOM first if re-rendering
+                document.querySelectorAll('.custom-col-th, .custom-col-td').forEach(el => el.remove());
+
+                customColumns.forEach((colName) => {
+                    // Add TH
+                    const th = document.createElement('th');
+                    th.className = 'px-4 py-3 min-w-[150px] border-r border-slate-200 custom-col-th group/th relative bg-slate-50';
+                    th.setAttribute('data-col-id', `custom_${colName}`);
+                    th.innerHTML = `
+                        <div class="flex items-center justify-between pointer-events-none">
+                            <span>${colName}</span>
+                            <button onclick="confirmRemoveCustomColumn('${colName}')" class="opacity-0 group-hover/th:opacity-100 text-red-400 hover:text-red-600 p-1 pointer-events-auto" title="刪除欄位">
+                                <span class="material-symbols-outlined text-[14px]">close</span>
+                            </button>
+                        </div>
+                    `;
+                    theadTr.appendChild(th);
+
+                    // Add TD to each row
+                    tbodyTrs.forEach(tr => {
+                        const projId = tr.getAttribute('data-id');
+                        const td = document.createElement('td');
+                        td.className = 'px-4 py-3 text-slate-700 whitespace-normal custom-col-td border-r border-slate-100 hover:bg-white transition-colors cursor-text focus:bg-white focus:ring-1 focus:ring-primary/50';
+                        td.setAttribute('data-col-id', `custom_${colName}`);
+                        td.contentEditable = 'true';
+                        td.style.outline = 'none';
+                        td.innerText = (customData[projId] && customData[projId][colName]) || '';
+                        
+                        // Save on blur
+                        td.addEventListener('blur', function() {
+                            const val = this.innerText;
+                            if (!customData[projId]) customData[projId] = {};
+                            customData[projId][colName] = val;
+                            localStorage.setItem('proj_custom_data', JSON.stringify(customData));
+                        });
+                        
+                        tr.appendChild(td);
+                    });
+                });
+            }
+
+            function addCustomColumn() {
+                const modal = document.getElementById('custom-col-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                document.getElementById('custom-col-input').value = '';
+                document.getElementById('custom-col-input').focus();
+            }
+            
+            function closeCustomColModal() {
+                const modal = document.getElementById('custom-col-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            function submitCustomColumn() {
+                const input = document.getElementById('custom-col-input');
+                const colName = input.value.trim();
+                if (!colName) {
+                    closeCustomColModal();
+                    return;
+                }
+                if (customColumns.includes(colName)) {
+                    alert('此欄位名稱已存在！');
+                    return;
+                }
+                customColumns.push(colName);
+                localStorage.setItem('proj_custom_columns', JSON.stringify(customColumns));
+                renderCustomColumns();
+                enforceSavedColumnOrder();
+                initColumnReordering();
+                closeCustomColModal();
+            }
+
+            function confirmRemoveCustomColumn(colName) {
+                document.getElementById('custom-confirm-msg').innerText = `確定要刪除「${colName}」欄位嗎？這將會清除該欄位所有記錄！`;
+                const modal = document.getElementById('custom-confirm-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                
+                document.getElementById('custom-confirm-btn').onclick = function() {
+                    executeRemoveCustomColumn(colName);
+                };
+            }
+
+            function closeCustomConfirmModal() {
+                const modal = document.getElementById('custom-confirm-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            function executeRemoveCustomColumn(colName) {
+                customColumns = customColumns.filter(c => c !== colName);
+                localStorage.setItem('proj_custom_columns', JSON.stringify(customColumns));
+                // Clean up data
+                for (const projId in customData) {
+                    if (customData[projId]) {
+                        delete customData[projId][colName];
+                    }
+                }
+                localStorage.setItem('proj_custom_data', JSON.stringify(customData));
+                renderCustomColumns();
+                enforceSavedColumnOrder();
+                initColumnReordering();
+                closeCustomConfirmModal();
+            }
+
+            // =============================================
+            // Column Reordering (Drag and Drop)
+            // =============================================
+            let dragSrcEl = null;
+
+            function handleDragStart(e) {
+                if (!e.target.hasAttribute('data-col-id')) return;
+                dragSrcEl = e.target;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', e.target.innerHTML);
+                e.target.classList.add('opacity-50');
+            }
+
+            function handleDragOver(e) {
+                if (e.preventDefault) {
+                    e.preventDefault();
+                }
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter(e) {
+                const target = e.target.closest('th');
+                if (target && target !== dragSrcEl && target.hasAttribute('data-col-id')) {
+                    target.classList.add('bg-blue-100');
+                }
+            }
+
+            function handleDragLeave(e) {
+                const target = e.target.closest('th');
+                if (target && target.hasAttribute('data-col-id')) {
+                    target.classList.remove('bg-blue-100');
+                }
+            }
+
+            function handleDrop(e) {
+                if (e.stopPropagation) {
+                    e.stopPropagation();
+                }
+                const target = e.target.closest('th');
+                if (dragSrcEl !== target && target && target.hasAttribute('data-col-id')) {
+                    const srcId = dragSrcEl.getAttribute('data-col-id');
+                    const targetId = target.getAttribute('data-col-id');
+                    reorderColumnsInDOM(srcId, targetId);
+                }
+                return false;
+            }
+
+            function handleDragEnd(e) {
+                document.querySelectorAll('#project-table th').forEach(th => {
+                    th.classList.remove('opacity-50', 'bg-blue-100');
+                });
+            }
+
+            function reorderColumnsInDOM(srcId, targetId) {
+                const theadTr = document.querySelector('#project-table thead tr');
+                let colIds = Array.from(theadTr.querySelectorAll('th[data-col-id]')).map(th => th.getAttribute('data-col-id'));
+                
+                const srcIndex = colIds.indexOf(srcId);
+                let targetIndex = colIds.indexOf(targetId);
+                
+                if (srcIndex === -1 || targetIndex === -1) return;
+
+                colIds.splice(srcIndex, 1);
+                targetIndex = colIds.indexOf(targetId);
+                colIds.splice(targetIndex, 0, srcId); // insert before target
+                
+                applyColumnOrder(colIds);
+                localStorage.setItem('proj_column_order', JSON.stringify(colIds));
+            }
+
+            function applyColumnOrder(colIds) {
+                const theadTr = document.querySelector('#project-table thead tr');
+                const tbodyTrs = document.querySelectorAll('#project-table tbody tr.project-row');
+                
+                colIds.forEach(id => {
+                    const th = theadTr.querySelector(`th[data-col-id="${id}"]`);
+                    if (th) theadTr.appendChild(th);
+                });
+                
+                tbodyTrs.forEach(tr => {
+                    colIds.forEach(id => {
+                        const td = tr.querySelector(`td[data-col-id="${id}"]`);
+                        if (td) tr.appendChild(td);
+                    });
+                });
+            }
+
+            function initColumnReordering() {
+                const ths = document.querySelectorAll('#project-table th[data-col-id]');
+                ths.forEach(th => {
+                    th.setAttribute('draggable', 'true');
+                    th.classList.add('cursor-move');
+                    
+                    th.removeEventListener('dragstart', handleDragStart);
+                    th.removeEventListener('dragenter', handleDragEnter);
+                    th.removeEventListener('dragover', handleDragOver);
+                    th.removeEventListener('dragleave', handleDragLeave);
+                    th.removeEventListener('drop', handleDrop);
+                    th.removeEventListener('dragend', handleDragEnd);
+
+                    th.addEventListener('dragstart', handleDragStart);
+                    th.addEventListener('dragenter', handleDragEnter);
+                    th.addEventListener('dragover', handleDragOver);
+                    th.addEventListener('dragleave', handleDragLeave);
+                    th.addEventListener('drop', handleDrop);
+                    th.addEventListener('dragend', handleDragEnd);
+                });
+            }
+
+            function enforceSavedColumnOrder() {
+                try {
+                    const savedOrder = JSON.parse(localStorage.getItem('proj_column_order'));
+                    if (savedOrder && Array.isArray(savedOrder)) {
+                        const currentIds = Array.from(document.querySelectorAll('#project-table th[data-col-id]')).map(th => th.getAttribute('data-col-id'));
+                        const finalOrder = [];
+                        savedOrder.forEach(id => {
+                            if (currentIds.includes(id)) finalOrder.push(id);
+                        });
+                        currentIds.forEach(id => {
+                            if (!finalOrder.includes(id)) finalOrder.push(id);
+                        });
+                        applyColumnOrder(finalOrder);
+                    }
+                } catch(e) {
+                    console.error("Error enforcing column order:", e);
+                }
+            }
+
+            // =============================================
+            // Dynamic time markers
+            // =============================================
+            function getScaledWidth() {
+                const scrollContainer = document.getElementById('view-timeline');
+                const viewWidth = scrollContainer ? (scrollContainer.clientWidth - LEFT_COL_WIDTH) : BASE_MIN_WIDTH;
+                return Math.max(viewWidth, Math.round(FULL_WIDTH_AT_100 * currentScale));
+            }
+
+            function getTimelineTotal() {
+                return (TIMELINE_END - TIMELINE_START) / (1000 * 60 * 60 * 24);
+            }
+
+            function determineScale() {
+                const scaledWidth = getScaledWidth();
+                const totalDays = getTimelineTotal();
+                const pxPerDay = scaledWidth / totalDays;
+
+                if (pxPerDay >= 8) return 'month';
+                if (pxPerDay >= 2) return 'quarter';
+                return 'year';
+            }
+
+            function generateTimeMarkers() {
+                const scale = determineScale();
+                const totalDays = getTimelineTotal();
+                const markers = [];
+
+                let current;
+                const tlStart = TIMELINE_START;
+                const tlEnd = TIMELINE_END;
+
+                if (scale === 'month') {
+                    current = new Date(tlStart.getFullYear(), tlStart.getMonth(), 1);
+                } else if (scale === 'quarter') {
+                    const qm = Math.floor(tlStart.getMonth() / 3) * 3;
+                    current = new Date(tlStart.getFullYear(), qm, 1);
+                } else {
+                    current = new Date(tlStart.getFullYear(), 0, 1);
+                }
+
+                while (current < tlEnd) {
+                    let nextDate, label;
+                    if (scale === 'month') {
+                        label = current.getFullYear() + '/' + String(current.getMonth() + 1).padStart(2, '0');
+                        nextDate = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+                    } else if (scale === 'quarter') {
+                        const q = Math.floor(current.getMonth() / 3) + 1;
+                        label = current.getFullYear() + ' Q' + q;
+                        nextDate = new Date(current.getFullYear(), current.getMonth() + 3, 1);
+                    } else {
+                        label = String(current.getFullYear());
+                        nextDate = new Date(current.getFullYear() + 1, 0, 1);
+                    }
+
+                    const markerStart = current < tlStart ? tlStart : current;
+                    const markerEnd = nextDate > tlEnd ? tlEnd : nextDate;
+                    const markerDays = (markerEnd - markerStart) / (1000 * 60 * 60 * 24);
+
+                    if (markerDays > 0) {
+                        const widthPct = (markerDays / totalDays) * 100;
+                        markers.push({ label, widthPct });
+                    }
+                    current = nextDate;
+                }
+                return markers;
+            }
+
+            function renderTimeMarkers() {
+                const markers = generateTimeMarkers();
+                const container = document.getElementById('timeline-container');
+
+                let headerHtml = '';
+                for (const m of markers) {
+                    headerHtml += `<div class="border-r border-slate-200 px-2 py-3 font-bold text-slate-700 text-xs sm:text-sm flex flex-col justify-center shrink-0" style="width: ${m.widthPct}%;"><span class="truncate" title="${m.label}">${m.label}</span></div>`;
+                }
+
+                // Today label in header
+                headerHtml += `<div class="absolute top-0 bottom-0 z-[5] pointer-events-none" style="left: ${TODAY_PCT}%;"><div class="w-[2px] h-full bg-red-500"></div><div class="absolute top-0 left-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-b font-bold whitespace-nowrap">今天</div></div>`;
+
+                container.innerHTML = headerHtml;
+
+                // Grid lines in each row
+                let gridHtml = '';
+                for (const m of markers) {
+                    gridHtml += `<div class="border-r border-slate-100 h-full" style="width: ${m.widthPct}%;"></div>`;
+                }
+                document.querySelectorAll('.timeline-grid').forEach(grid => {
+                    grid.innerHTML = gridHtml;
+                });
+            }
+
+            // =============================================
+            // Zoom logic with viewport preservation
+            // =============================================
+            function applyZoomLayout() {
+                const container = document.getElementById('timeline-container');
+                const rows = document.querySelectorAll('.timeline-row-content');
+                const newWidth = getScaledWidth();
+
+                container.style.minWidth = `${newWidth}px`;
+                rows.forEach(row => {
+                    row.style.minWidth = `${newWidth}px`;
+                });
+
+                // Force layout recalculation
+                void container.offsetWidth;
+
+                document.getElementById('zoom-level').innerText = `${Math.round(currentScale * 100)}%`;
+
+                // Re-generate time markers based on new scale
+                renderTimeMarkers();
+            }
+
+            function scrollToToday() {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+
+                applyZoomLayout();
+
+                // Use double-rAF to ensure layout is fully settled
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        const newWidth = getScaledWidth();
+                        const todayPos = (TODAY_PCT / 100) * newWidth;
+                        const viewWidth = scrollContainer.clientWidth - LEFT_COL_WIDTH;
+                        scrollContainer.scrollLeft = Math.max(0, todayPos - viewWidth / 2);
+                        updateBarTextPositions();
+                    });
+                });
+            }
+
+            // "回到今天" button - only scroll, do NOT change scale
+            function scrollToTodayOnly() {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+
+                // Force layout
+                void document.getElementById('timeline-container').offsetWidth;
+
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        const newWidth = getScaledWidth();
+                        const todayPos = (TODAY_PCT / 100) * newWidth;
+                        const viewWidth = scrollContainer.clientWidth - LEFT_COL_WIDTH;
+                        scrollContainer.scrollLeft = Math.max(0, todayPos - viewWidth / 2);
+                        updateBarTextPositions();
+                    });
+                });
+            }
+
+            function updateBarTextPositions() {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+                const scrollLeft = scrollContainer.scrollLeft;
+
+                document.querySelectorAll('.timeline-bar').forEach(bar => {
+                    const barLeft = bar.offsetLeft;
+                    const textEl = bar.querySelector('.bar-text');
+                    if (!textEl) return;
+
+                    if (barLeft < scrollLeft) {
+                        const shift = scrollLeft - barLeft;
+                        textEl.style.transform = `translateX(${shift}px)`;
+                    } else {
+                        textEl.style.transform = 'translateX(0)';
+                    }
+                });
+            }
+
+            function zoomTimeline(delta) {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+
+                // Record the current center position as a fraction of the full timeline
+                const oldWidth = getScaledWidth();
+                const viewWidth = scrollContainer.clientWidth - LEFT_COL_WIDTH;
+                const centerX = scrollContainer.scrollLeft + viewWidth / 2;
+                const centerFraction = centerX / oldWidth;
+
+                // Apply new scale
+                const minScale = viewWidth / FULL_WIDTH_AT_100;
+                currentScale = Math.max(minScale, Math.min(5.0, currentScale + delta));
+
+                const newWidth = getScaledWidth();
+
+                // Update DOM
+                const container = document.getElementById('timeline-container');
+                const rows = document.querySelectorAll('.timeline-row-content');
+                container.style.minWidth = `${newWidth}px`;
+                rows.forEach(row => {
+                    row.style.minWidth = `${newWidth}px`;
+                });
+                void container.offsetWidth;
+
+                document.getElementById('zoom-level').innerText = `${Math.round(currentScale * 100)}%`;
+                renderTimeMarkers();
+
+                // Restore viewport center to the same fraction
+                requestAnimationFrame(function() {
+                    const newCenterX = centerFraction * newWidth;
+                    scrollContainer.scrollLeft = Math.max(0, newCenterX - viewWidth / 2);
+                    updateBarTextPositions();
+                });
+            }
+
+            function resetZoom() {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+
+                // Preserve viewport center
+                const oldWidth = getScaledWidth();
+                const viewWidth = scrollContainer.clientWidth - LEFT_COL_WIDTH;
+                const centerX = scrollContainer.scrollLeft + viewWidth / 2;
+                const centerFraction = centerX / oldWidth;
+
+                currentScale = 1.0;
+
+                const newWidth = getScaledWidth();
+                const container = document.getElementById('timeline-container');
+                const rows = document.querySelectorAll('.timeline-row-content');
+                container.style.minWidth = `${newWidth}px`;
+                rows.forEach(row => {
+                    row.style.minWidth = `${newWidth}px`;
+                });
+                void container.offsetWidth;
+
+                document.getElementById('zoom-level').innerText = '100%';
+                renderTimeMarkers();
+
+                requestAnimationFrame(function() {
+                    requestAnimationFrame(function() {
+                        const finalWidth = getScaledWidth();
+                        const newCenterX = centerFraction * finalWidth;
+                        scrollContainer.scrollLeft = Math.max(0, newCenterX - viewWidth / 2);
+                        updateBarTextPositions();
+                    });
+                });
+            }
+
+            function showAllProjects() {
+                const scrollContainer = document.getElementById('view-timeline');
+                if (!scrollContainer) return;
+                const viewWidth = scrollContainer.clientWidth - LEFT_COL_WIDTH;
+                currentScale = Math.max(0.1, viewWidth / FULL_WIDTH_AT_100);
+                applyZoomLayout();
+                scrollContainer.scrollLeft = 0;
+                requestAnimationFrame(updateBarTextPositions);
+            }
+
+            // scroll listener
+            (function () {
+                const el = document.getElementById('view-timeline');
+                if (el) {
+                    el.addEventListener('scroll', function () {
+                        requestAnimationFrame(updateBarTextPositions);
+                    });
+                }
+            })();
+
+            // =============================================
+            // Month range and table filters
+            // =============================================
+            function setupTableFilters() {
+                const headers = document.querySelectorAll('#project-table th');
+                let repColIdx = -1;
+                let statusColIdx = -1;
+                let personnelColIdx = -1;
+                
+                headers.forEach((th, idx) => {
+                    const text = th.innerText.trim();
+                    if (text.includes('業務代表')) repColIdx = idx;
+                    if (text.includes('狀態')) statusColIdx = idx;
+                    if (text.includes('人員名單')) personnelColIdx = idx;
+                });
+
+                if (repColIdx > -1) addFilterSelect(repColIdx, 'filter-rep');
+                if (statusColIdx > -1) addFilterSelect(statusColIdx, 'filter-status');
+                
+                if (personnelColIdx > -1) {
+                    const th = headers[personnelColIdx];
+                    const rows = document.querySelectorAll('#project-table tbody tr.project-row');
+                    const values = new Set();
+                    rows.forEach(row => {
+                        const cell = row.children[personnelColIdx];
+                        if (cell) {
+                            const spans = cell.querySelectorAll('span');
+                            spans.forEach(span => values.add(span.innerText.trim()));
+                        }
+                    });
+                    
+                    const select = document.createElement('select');
+                    select.id = 'filter-personnel';
+                    select.className = 'ml-2 text-xs font-normal border-slate-300 rounded p-0.5 bg-slate-50 text-slate-700 cursor-pointer shadow-sm w-20';
+                    select.onchange = applyDateFilter;
+                    
+                    const optAll = document.createElement('option');
+                    optAll.value = '';
+                    optAll.innerText = '全部';
+                    select.appendChild(optAll);
+
+                    Array.from(values).sort().forEach(val => {
+                        const opt = document.createElement('option');
+                        opt.value = val;
+                        opt.innerText = val;
+                        select.appendChild(opt);
+                    });
+
+                    const originalText = th.innerText;
+                    th.innerHTML = `<div class="flex items-center justify-between"><span>${originalText}</span></div>`;
+                    th.querySelector('div').appendChild(select);
+                }
+            }
+
+            function addFilterSelect(colIdx, id) {
+                const th = document.querySelectorAll('#project-table th')[colIdx];
+                const rows = document.querySelectorAll('#project-table tbody tr.project-row');
+                const values = new Set();
+                
+                rows.forEach(row => {
+                    const cell = row.children[colIdx];
+                    if (cell) {
+                        const val = cell.innerText.trim();
+                        if (val) values.add(val);
+                    }
+                });
+
+                const select = document.createElement('select');
+                select.id = id;
+                select.className = 'ml-2 text-xs font-normal border-slate-300 rounded p-0.5 bg-slate-50 text-slate-700 cursor-pointer shadow-sm';
+                select.onchange = applyDateFilter;
+                
+                const optAll = document.createElement('option');
+                optAll.value = '';
+                optAll.innerText = '全部';
+                select.appendChild(optAll);
+
+                Array.from(values).sort().forEach(val => {
+                    const opt = document.createElement('option');
+                    opt.value = val;
+                    opt.innerText = val;
+                    select.appendChild(opt);
+                });
+
+                const originalText = th.innerText;
+                th.innerHTML = `<div class="flex items-center justify-between"><span>${originalText}</span></div>`;
+                th.querySelector('div').appendChild(select);
+            }
+
+            function applyDateFilter() {
+                const filterStartStr = document.getElementById('filter-start').value; // e.g. "2025-06"
+                const filterEndStr = document.getElementById('filter-end').value;     // e.g. "2026-01"
+                
+                const filterRepEl = document.getElementById('filter-rep');
+                const filterStatusEl = document.getElementById('filter-status');
+                const filterPersonnelEl = document.getElementById('filter-personnel');
+                const filterKeywordEl = document.getElementById('filter-keyword');
+                
+                const repVal = filterRepEl ? filterRepEl.value : '';
+                const statusVal = filterStatusEl ? filterStatusEl.value : '';
+                const personnelVal = filterPersonnelEl ? filterPersonnelEl.value : '';
+                const keywordVal = filterKeywordEl ? filterKeywordEl.value.toLowerCase().trim() : '';
+
+                // Convert YYYY-MM to start/end of that month
+                let filterStart = null, filterEnd = null;
+                if (filterStartStr) {
+                    const [y, m] = filterStartStr.split('-').map(Number);
+                    filterStart = new Date(y, m - 1, 1); // first day of month
+                }
+                if (filterEndStr) {
+                    const [y, m] = filterEndStr.split('-').map(Number);
+                    filterEnd = new Date(y, m, 0); // last day of month
+                }
+
+                // Filter table rows (overlap check)
+                document.querySelectorAll('.project-row').forEach(row => {
+                    filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal);
+                });
+
+                // Filter timeline rows (overlap check) + recompute bar positions
+                document.querySelectorAll('.timeline-project-row').forEach(row => {
+                    filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal);
+                });
+
+                // Update timeline range to match filter
+                updateTimelineRange(filterStart, filterEnd);
+            }
+
+            function filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal) {
+                const startStr = row.getAttribute('data-start');
+                const endStr = row.getAttribute('data-end');
+                const rowRep = row.getAttribute('data-rep');
+                const rowStatus = row.getAttribute('data-status');
+                const rowPersonnel = row.getAttribute('data-personnel') || '';
+                const rowName = row.getAttribute('data-name') || '';
+                
+                if (!startStr) { row.style.display = ''; return; }
+
+                const projStart = new Date(startStr);
+                const projEnd = endStr ? new Date(endStr) : new Date(startStr);
+                let show = true;
+
+                // Check overlap: project overlaps with [filterStart, filterEnd]
+                if (filterStart && projEnd < filterStart) show = false;
+                if (filterEnd && projStart > filterEnd) show = false;
+                
+                // Exact match for rep, status, personnel and keyword if selected
+                if (show && repVal && rowRep !== repVal) show = false;
+                if (show && statusVal && rowStatus !== statusVal) show = false;
+                if (show && personnelVal && !rowPersonnel.split(',').includes(personnelVal)) show = false;
+                if (show && keywordVal && !rowName.includes(keywordVal)) show = false;
+
+                row.style.display = show ? '' : 'none';
+            }
+
+            // Recompute the active timeline range and reposition bars
+            function updateTimelineRange(filterStart, filterEnd) {
+                if (filterStart || filterEnd) {
+                    // Use filter boundaries as the new visible range
+                    TIMELINE_START = filterStart ? filterStart : new Date(ORIG_TIMELINE_START);
+                    TIMELINE_END = filterEnd ? filterEnd : new Date(ORIG_TIMELINE_END);
+                } else {
+                    // No filter — restore original range
+                    TIMELINE_START = new Date(ORIG_TIMELINE_START);
+                    TIMELINE_END = new Date(ORIG_TIMELINE_END);
+                }
+
+                const totalDays = getTimelineTotal();
+                const todayDate = new Date();
+                todayDate.setHours(0,0,0,0);
+
+                // Recompute today's percentage within the active range
+                const todayOffset = (todayDate - TIMELINE_START) / (1000 * 60 * 60 * 24);
+                TODAY_PCT = (todayOffset / totalDays) * 100;
+
+                // Reposition today lines
+                document.querySelectorAll('.today-line').forEach(el => {
+                    if (TODAY_PCT >= 0 && TODAY_PCT <= 100) {
+                        el.style.left = TODAY_PCT + '%';
+                        el.style.display = '';
+                    } else {
+                        el.style.display = 'none';
+                    }
+                });
+
+                // Recompute each timeline bar's position relative to the new range
+                document.querySelectorAll('.timeline-project-row').forEach(row => {
+                    const bar = row.querySelector('.timeline-bar');
+                    if (!bar) return;
+                    if (row.style.display === 'none') return;
+
+                    const startStr = row.getAttribute('data-start');
+                    const endStr = row.getAttribute('data-end');
+                    if (!startStr) return;
+
+                    const projStart = new Date(startStr);
+                    let projEnd = endStr ? new Date(endStr) : new Date(projStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+                    // Clamp project dates to the visible range
+                    const visStart = new Date(Math.max(projStart.getTime(), TIMELINE_START.getTime()));
+                    const visEnd = new Date(Math.min(projEnd.getTime(), TIMELINE_END.getTime()));
+
+                    const offsetDays = (visStart - TIMELINE_START) / (1000 * 60 * 60 * 24);
+                    const durationDays = Math.max(1, (visEnd - visStart) / (1000 * 60 * 60 * 24));
+
+                    const leftPct = Math.max(0, (offsetDays / totalDays) * 100);
+                    const widthPct = Math.min(100 - leftPct, (durationDays / totalDays) * 100);
+
+                    bar.style.left = leftPct + '%';
+                    bar.style.width = widthPct + '%';
+                });
+
+                // Re-render time markers and update zoom layout
+                renderTimeMarkers();
+                applyZoomLayout();
+            }
+
+            function resetDateFilter() {
+                document.getElementById('filter-start').value = '';
+                document.getElementById('filter-end').value = '';
+                document.getElementById('filter-keyword').value = '';
+                const filterRepEl = document.getElementById('filter-rep');
+                const filterStatusEl = document.getElementById('filter-status');
+                const filterPersonnelEl = document.getElementById('filter-personnel');
+                
+                if (filterRepEl) filterRepEl.value = '';
+                if (filterStatusEl) filterStatusEl.value = '';
+                if (filterPersonnelEl) filterPersonnelEl.value = '';
+                
+                applyDateFilter();
+            }
+
+            // =============================================
+            // Tab switch
+            // =============================================
+            function switchTab(tabId) {
+                currentTab = tabId;
+                document.getElementById('view-table').classList.add('hidden');
+                document.getElementById('view-timeline').classList.add('hidden');
+
+                document.getElementById('btn-table').className = "flex items-center gap-2 pb-2 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent -mb-[9px] transition-colors";
+                document.getElementById('btn-timeline').className = "flex items-center gap-2 pb-2 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent -mb-[9px] transition-colors";
+
+                document.getElementById('view-' + tabId).classList.remove('hidden');
+                const zoomControls = document.getElementById('zoom-controls');
+
+                if (tabId === 'table') {
+                    document.getElementById('btn-table').className = "flex items-center gap-2 pb-2 text-sm font-bold text-primary border-b-2 border-primary -mb-[9px] transition-colors";
+                    if (zoomControls) zoomControls.classList.add('hidden');
+                    const btnAddCol = document.getElementById('btn-add-col');
+                    if (btnAddCol) btnAddCol.style.display = 'flex';
+                } else {
+                    document.getElementById('btn-timeline').className = "flex items-center gap-2 pb-2 text-sm font-bold text-primary border-b-2 border-primary -mb-[9px] transition-colors";
+                    if (zoomControls) zoomControls.classList.remove('hidden');
+                    const btnAddCol = document.getElementById('btn-add-col');
+                    if (btnAddCol) btnAddCol.style.display = 'none';
+
+                    setTimeout(function () {
+                        scrollToToday();
+                    }, 100);
+                }
+            }
+
+            // =============================================
+            // Init on page load
+            // =============================================
+            document.addEventListener('DOMContentLoaded', function() {
+                renderCustomColumns();
+                enforceSavedColumnOrder();
+                setupTableFilters();
+                initColumnReordering();
+                renderTimeMarkers();
+            });
+        </script>
+        {% endblock %}

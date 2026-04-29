@@ -1,0 +1,112 @@
+/* 自訂字體 */
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+/* 自訂下拉選單 (Select) 樣式 */
+select.form-input {
+    appearance: none;
+    background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E');
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 1.25em 1.25em;
+}
+
+/* 自訂捲軸 (Scrollbar) 樣式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* =========================================
+   Custom Extracted Classes for Dashboard
+   ========================================= */
+
+/* User Profile Avatar Backgrounds */
+.user-avatar-bg {
+    background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAIHPGuSVjVwlY3NH76NhArXnVa6caDHxFlmu3de_lC4HetHa8ZFg8i1Dn8HQhh9yvAiWF1xbHbrp1PXWFFCpMM-v1Dp-hUX6q6BxtFt7gDIZusoThcB63IzLPwsRyA5IA2vz_DTFGMyrXSDG-MRVOux0mxiKvLjf6uDZp_RvoTO6VyoVO7jYq2P66Tk0j3tTrjuJkqeOh4IaaqD0trSPoFk1ihzLcijEIn7r3lDGwBm_XplblC0v2x0fNW3ZBuhK1ycQqltYWEfXs');
+}
+
+.employee-avatar-bg {
+    background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDORtQnhuUuUbYUoxtAJvA92MAeprNZxqiYd3tJIhElPvMAFB038Z172TT2LR19dV5pZgY9VCJOo4Y6aC9Et_0DSFmBg_w4OGvL52Q-IIX6QNwspjtJ0oyesAZBZJEMMoOteT710eNJ5xCjLQSVeSXs_bb1__o-l_e5gOyvezxz31MFMpxJKiw90CX9i7T4zFa-dztAplDfO3MxKLcIWJTStDYynssFldHIUOtv6zo-huEVeiKBkWnRhStisZB71YpsILcld4OiIdI');
+}
+
+/* Project Timeline Classes */
+.tab-btn {
+    @apply flex items-center gap-2 pb-2 text-sm font-medium text-slate-500 hover:text-slate-800 border-b-2 border-transparent -mb-[9px] transition-colors;
+}
+
+.tab-btn-active {
+    @apply flex items-center gap-2 pb-2 text-sm font-bold text-primary border-b-2 border-primary -mb-[9px] transition-colors;
+}
+
+.timeline-card {
+    @apply absolute h-[36px] mt-[12px] bg-[#2a2b2d] rounded-md shadow-md flex items-center px-3 gap-3 cursor-pointer hover:bg-[#3f4042] border border-slate-600/50;
+    min-width: 250px;
+}
+
+.timeline-card-title {
+    @apply text-[13px] font-semibold text-white truncate;
+}
+
+.timeline-card-badge {
+    @apply text-white text-[11px] px-1.5 py-0.5 rounded font-medium whitespace-nowrap;
+}
+
+.timeline-card-rep {
+    @apply text-slate-300 text-[12px] whitespace-nowrap;
+}
+
+.timeline-card-desc {
+    @apply text-slate-400 text-[12px] truncate;
+}
+
+/* Table Classes extracted from proj_timeline */
+.action-btn-edit {
+    @apply text-blue-600 hover:bg-blue-50 p-1.5 rounded transition-colors;
+}
+
+.action-btn-delete {
+    @apply text-red-500 hover:bg-red-50 p-1.5 rounded transition-colors;
+}
+
+.status-badge-progress {
+    @apply px-2 py-1 bg-amber-100 text-amber-800 rounded font-medium text-xs;
+}
+
+.status-badge-paused {
+    @apply px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium text-xs;
+}
+
+.status-badge-waiting {
+    @apply px-2 py-1 bg-pink-100 text-pink-800 rounded font-medium text-xs;
+}
+
+.status-badge-default {
+    @apply px-2 py-1 bg-slate-100 text-slate-800 rounded font-medium text-xs;
+}
+
+.rep-badge {
+    @apply px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 text-xs;
+}
