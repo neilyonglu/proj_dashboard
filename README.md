@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 專案管理與工時追蹤系統 (Project Dashboard)
 
 一個基於 Python Flask 開發的輕量級企業內部專案與人員工時管理系統。提供直覺的介面來管理專案進度、人員工作紀錄、並具備甘特圖式的時間軸檢視以及完整的資料庫匯入/匯出功能。
@@ -75,6 +74,3 @@ proj_dashboard/
 ## 📄 授權 (License)
 
 This project is intended for internal company use.
-=======
-# proj_dashboard
->>>>>>> ee2a7b3d78e3cabf97afe51cbe1307f868cc9b15
