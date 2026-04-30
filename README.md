@@ -25,6 +25,8 @@
 ```text
 proj_dashboard/
 ├── app.py                 # 應用程式主程式與所有路由邏輯
+├── build.bat              # Windows 打包執行檔腳本 (PyInstaller)
+├── build.sh               # Bash 打包執行檔腳本 (PyInstaller)
 ├── .env                   # 環境變數設定檔 (需手動建立)
 ├── instance/
 │   └── app.db             # SQLite 資料庫檔案 (系統自動建立)
@@ -65,6 +67,21 @@ proj_dashboard/
    ```
    伺服器啟動後，請打開瀏覽器並前往：[http://localhost:5001](http://localhost:5001)
 
+## 📦 打包執行檔 (Packaging)
+
+若要將系統打包為單一的可執行檔 (`.exe`)，以便在未安裝 Python 的電腦上或方便佈署執行：
+
+1. **安裝 PyInstaller**：
+   ```bash
+   pip install pyinstaller
+   ```
+2. **執行打包腳本**：
+   - **Windows CMD / PowerShell**: 執行 `build.bat`
+   - **Git Bash / Linux / macOS**: 執行 `./build.sh`
+3. **完成打包**：
+   打包完成後，會在專案根目錄產生 `proj_dash.exe`。
+   *(註：打包出的 exe 檔案會自動讀取同層目錄下的 `templates` 與 `static` 資料夾，因此在部屬 exe 給其他人使用時，請將 `proj_dash.exe` 與這兩個資料夾放在同一個目錄下。)*
+
 ## 💡 使用說明
 
 1. **首次啟動**：系統會自動建立 `instance/app.db` 資料庫，並預先寫入一些預設的業務代表、專案種類與人員名單。
@@ -73,8 +90,4 @@ proj_dashboard/
 
 ## 📄 授權 (License)
 
-<<<<<<< HEAD
 This project is intended for internal company use.
-=======
-This project is intended for internal company use.
->>>>>>> f4b004dd517168500d9245705b9bf30aabcbe8d0
