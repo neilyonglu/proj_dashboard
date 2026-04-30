@@ -73,4 +73,8 @@ proj_dashboard/
 
 ## 📄 授權 (License)
 
+<<<<<<< HEAD
 This project is intended for internal company use.
+=======
+This project is intended for internal company use.
+>>>>>>> f4b004dd517168500d9245705b9bf30aabcbe8d0
