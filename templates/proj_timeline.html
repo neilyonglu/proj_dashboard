@@ -107,6 +107,55 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* #6 Prominent horizontal scrollbar for the timeline */
+        #view-timeline {
+            scrollbar-width: auto;
+            scrollbar-color: #94a3b8 #e2e8f0;
+        }
+        #view-timeline::-webkit-scrollbar {
+            height: 14px;
+            width: 14px;
+        }
+        #view-timeline::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 8px;
+        }
+        #view-timeline::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 8px;
+            border: 3px solid #e2e8f0;
+        }
+        #view-timeline::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* #5 Floating read-only tooltip */
+        #seg-tooltip {
+            position: fixed;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+            max-width: 320px;
+            background: #0f172a;
+            color: #fff;
+            font-size: 12px;
+            line-height: 1.5;
+            padding: 10px 12px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+        }
+        #seg-tooltip .tt-title { font-weight: 700; margin-bottom: 4px; }
+        #seg-tooltip .tt-row { color: #cbd5e1; }
+        #seg-tooltip .tt-row b { color: #fff; font-weight: 600; }
+
+        /* #3 Today line emphasis */
+        .today-line .today-bar {
+            width: 2px;
+            height: 100%;
+            background: #ef4444;
+            box-shadow: 0 0 6px rgba(239, 68, 68, .6);
+        }
     </style>
 
     <!-- show flash messages (auto-dismiss) -->
@@ -265,7 +314,7 @@
                             <!-- Today red line -->
                             <div class="today-line absolute top-0 bottom-0 z-[5] pointer-events-none"
                                 style="left: {{ today_pct }}%;">
-                                <div class="w-[2px] h-full bg-red-500"></div>
+                                <div class="today-bar"></div>
                             </div>
 
                             <!-- Main project background -->
@@ -283,8 +332,16 @@
 
                             <!-- Task segments (Solid bars) -->
                             {% for seg in item.segments %}
-                            <div class="timeline-bar absolute h-[24px] mt-[18px] bg-primary rounded shadow-sm flex items-center hover:bg-blue-600 border border-blue-700 z-10 overflow-hidden cursor-pointer opacity-90 hover:opacity-100 transition-opacity"
-                                style="left: {{ seg.left }}%; width: {{ seg.width }}%; min-width: 40px;" title="{{ seg.personnel }} - {{ seg.work_days }} 天&#10;{{ seg.desc if seg.desc else '' }}">
+                            <div class="timeline-bar task-segment absolute h-[26px] mt-[17px] bg-gradient-to-b from-blue-500 to-blue-600 rounded-md shadow-sm flex items-center hover:from-blue-600 hover:to-blue-700 border border-blue-700/70 z-10 overflow-hidden cursor-pointer opacity-95 hover:opacity-100 transition-all"
+                                style="left: {{ seg.left }}%; width: {{ seg.width }}%; min-width: 40px;"
+                                data-personnel="{{ seg.personnel }}"
+                                data-date="{{ seg.date }}"
+                                data-days="{{ seg.work_days }}"
+                                data-day-hours="{{ seg.day_hours if seg.day_hours is not none else '' }}"
+                                data-ot-hours="{{ seg.overtime_hours if seg.overtime_hours is not none else '' }}"
+                                data-night-hours="{{ seg.night_hours if seg.night_hours is not none else '' }}"
+                                data-proj="{{ item.proj.name }}"
+                                data-desc="{{ seg.desc if seg.desc else '' }}">
                                 <div class="bar-text flex items-center px-1.5 h-full whitespace-nowrap w-full justify-center">
                                     <span class="text-[10px] font-bold text-white truncate drop-shadow-md">{{ seg.personnel }}</span>
                                 </div>
@@ -300,6 +357,9 @@
                 </div>
             </div>
         </div>
+
+        <!-- #5 Floating read-only tooltip for task segments -->
+        <div id="seg-tooltip"></div>
 
         <!-- Custom Column Modal -->
         <div id="custom-col-modal" class="fixed inset-0 bg-slate-900/50 z-50 hidden items-center justify-center">
@@ -331,8 +391,18 @@
             // =============================================
             // Data from server
             // =============================================
-            const ORIG_TIMELINE_START = new Date('{{ timeline_start.isoformat() }}');
-            const ORIG_TIMELINE_END = new Date('{{ timeline_end.isoformat() }}');
+            // #4 Parse 'YYYY-MM-DD' as a LOCAL date. Using new Date('YYYY-MM-DD')
+            // parses as UTC, which drifts by the timezone offset versus the
+            // local dates we build elsewhere — causing bars/markers to bleed
+            // into the adjacent month (e.g. April showing a sliver of May).
+            function parseLocalDate(str) {
+                if (!str) return null;
+                const parts = str.split('-').map(Number);
+                return new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+            }
+
+            const ORIG_TIMELINE_START = parseLocalDate('{{ timeline_start.isoformat() }}');
+            const ORIG_TIMELINE_END = parseLocalDate('{{ timeline_end.isoformat() }}');
             const ORIG_TODAY_PCT = {{ today_pct }};
             const DEFAULT_LEFT_PCT = {{ default_left_pct }};
             const DEFAULT_WIDTH_PCT = {{ default_width_pct }};
@@ -682,25 +752,46 @@
 
             function renderTimeMarkers() {
                 const markers = generateTimeMarkers();
+                const scale = determineScale();
                 const container = document.getElementById('timeline-container');
 
                 let headerHtml = '';
-                for (const m of markers) {
-                    headerHtml += `<div class="border-r border-slate-200 px-2 py-3 font-bold text-slate-700 text-xs sm:text-sm flex flex-col justify-center shrink-0" style="width: ${m.widthPct}%;"><span class="truncate" title="${m.label}">${m.label}</span></div>`;
-                }
+                markers.forEach((m, idx) => {
+                    // #3 Alternating month/period background for clearer separation
+                    const bandBg = (idx % 2 === 1) ? 'bg-slate-50/70' : 'bg-white';
+                    headerHtml += `<div class="border-r border-slate-200 px-2 py-3 font-bold text-slate-700 text-xs sm:text-sm flex flex-col justify-center shrink-0 ${bandBg}" style="width: ${m.widthPct}%;"><span class="truncate" title="${m.label}">${m.label}</span></div>`;
+                });
 
                 // Today label in header
-                headerHtml += `<div class="absolute top-0 bottom-0 z-[5] pointer-events-none" style="left: ${TODAY_PCT}%;"><div class="w-[2px] h-full bg-red-500"></div><div class="absolute top-0 left-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-b font-bold whitespace-nowrap">今天</div></div>`;
+                headerHtml += `<div class="absolute top-0 bottom-0 z-[5] pointer-events-none" style="left: ${TODAY_PCT}%;"><div class="today-bar"></div><div class="absolute top-0 left-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-b font-bold whitespace-nowrap shadow">今天</div></div>`;
 
                 container.innerHTML = headerHtml;
 
-                // Grid lines in each row
+                // Grid lines + alternating bands in each row
                 let gridHtml = '';
-                for (const m of markers) {
-                    gridHtml += `<div class="border-r border-slate-100 h-full" style="width: ${m.widthPct}%;"></div>`;
+                markers.forEach((m, idx) => {
+                    const bandBg = (idx % 2 === 1) ? 'bg-slate-50/50' : '';
+                    gridHtml += `<div class="border-r border-slate-200/70 h-full ${bandBg}" style="width: ${m.widthPct}%;"></div>`;
+                });
+
+                // #3 Weekend shading (only meaningful at month scale)
+                let weekendBg = '';
+                let weekendPos = '';
+                if (scale === 'month') {
+                    const totalDays = getTimelineTotal();
+                    const pxPerDay = getScaledWidth() / totalDays;
+                    const dow = TIMELINE_START.getDay();          // 0=Sun..6=Sat
+                    const firstSat = (6 - dow + 7) % 7;           // days from start to first Saturday
+                    const wk = 7 * pxPerDay;
+                    weekendBg = `repeating-linear-gradient(90deg, rgba(15,23,42,0.05) 0px, rgba(15,23,42,0.05) ${2 * pxPerDay}px, transparent ${2 * pxPerDay}px, transparent ${wk}px)`;
+                    weekendPos = `${firstSat * pxPerDay}px 0`;
                 }
+
                 document.querySelectorAll('.timeline-grid').forEach(grid => {
                     grid.innerHTML = gridHtml;
+                    grid.style.backgroundImage = weekendBg;
+                    grid.style.backgroundPosition = weekendPos;
+                    grid.style.backgroundRepeat = weekendBg ? 'repeat' : '';
                 });
             }
 
@@ -1010,8 +1101,8 @@
                 
                 if (!startStr) { row.style.display = ''; return; }
 
-                const projStart = new Date(startStr);
-                const projEnd = endStr ? new Date(endStr) : new Date(startStr);
+                const projStart = parseLocalDate(startStr);
+                const projEnd = endStr ? parseLocalDate(endStr) : parseLocalDate(startStr);
                 let show = true;
 
                 // Check overlap: project overlaps with [filterStart, filterEnd]
@@ -1032,7 +1123,12 @@
                 if (filterStart || filterEnd) {
                     // Use filter boundaries as the new visible range
                     TIMELINE_START = filterStart ? filterStart : new Date(ORIG_TIMELINE_START);
-                    TIMELINE_END = filterEnd ? filterEnd : new Date(ORIG_TIMELINE_END);
+                    // #4 End range = day AFTER the selected end month's last day, so the
+                    // whole end month renders at full width and the marker loop stops
+                    // cleanly without spilling a label of the following month.
+                    TIMELINE_END = filterEnd
+                        ? new Date(filterEnd.getFullYear(), filterEnd.getMonth(), filterEnd.getDate() + 1)
+                        : new Date(ORIG_TIMELINE_END);
                 } else {
                     // No filter — restore original range
                     TIMELINE_START = new Date(ORIG_TIMELINE_START);
@@ -1067,8 +1163,8 @@
                     const endStr = row.getAttribute('data-end');
                     if (!startStr) return;
 
-                    const projStart = new Date(startStr);
-                    let projEnd = endStr ? new Date(endStr) : new Date(projStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    const projStart = parseLocalDate(startStr);
+                    let projEnd = endStr ? parseLocalDate(endStr) : new Date(projStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
                     // Clamp project dates to the visible range
                     const visStart = new Date(Math.max(projStart.getTime(), TIMELINE_START.getTime()));
@@ -1136,6 +1232,54 @@
             }
 
             // =============================================
+            // #5 Read-only floating tooltip for task segments
+            // =============================================
+            function setupSegmentTooltip() {
+                const tooltip = document.getElementById('seg-tooltip');
+                if (!tooltip) return;
+
+                function buildHtml(el) {
+                    const hoursParts = [];
+                    if (el.dataset.dayHours !== '') hoursParts.push(`日班 <b>${el.dataset.dayHours}</b>`);
+                    if (el.dataset.otHours !== '') hoursParts.push(`加班 <b>${el.dataset.otHours}</b>`);
+                    if (el.dataset.nightHours !== '') hoursParts.push(`夜班 <b>${el.dataset.nightHours}</b>`);
+                    const hoursRow = hoursParts.length
+                        ? `<div class="tt-row">時數：${hoursParts.join(' / ')}</div>` : '';
+                    const descRow = el.dataset.desc
+                        ? `<div class="tt-row" style="margin-top:4px;">${el.dataset.desc}</div>` : '';
+                    return `
+                        <div class="tt-title">${el.dataset.personnel || ''}</div>
+                        <div class="tt-row">專案：<b>${el.dataset.proj || ''}</b></div>
+                        <div class="tt-row">日期：<b>${el.dataset.date || '-'}</b>　工作 <b>${el.dataset.days || '-'}</b> 天</div>
+                        ${hoursRow}
+                        ${descRow}`;
+                }
+
+                function position(e) {
+                    const pad = 14;
+                    let x = e.clientX + pad;
+                    let y = e.clientY + pad;
+                    const rect = tooltip.getBoundingClientRect();
+                    if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - pad;
+                    if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - pad;
+                    tooltip.style.left = x + 'px';
+                    tooltip.style.top = y + 'px';
+                }
+
+                document.querySelectorAll('.task-segment').forEach(seg => {
+                    seg.addEventListener('mouseenter', function (e) {
+                        tooltip.innerHTML = buildHtml(this);
+                        tooltip.style.display = 'block';
+                        position(e);
+                    });
+                    seg.addEventListener('mousemove', position);
+                    seg.addEventListener('mouseleave', function () {
+                        tooltip.style.display = 'none';
+                    });
+                });
+            }
+
+            // =============================================
             // Init on page load
             // =============================================
             document.addEventListener('DOMContentLoaded', function() {
@@ -1144,6 +1288,7 @@
                 setupTableFilters();
                 initColumnReordering();
                 renderTimeMarkers();
+                setupSegmentTooltip();
             });
         </script>
         {% endblock %}

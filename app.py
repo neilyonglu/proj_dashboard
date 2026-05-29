@@ -105,10 +105,95 @@ class Task(db.Model):
     personnel = db.Column(db.String(50), nullable=False)            # personnel
     date = db.Column(db.Date, nullable=False)                       # work date
     work_days = db.Column(db.Float, nullable=False)                 # work days (support decimal)
+    day_hours = db.Column(db.Float, nullable=True)                  # 日班時數 (day-shift hours)
+    overtime_hours = db.Column(db.Float, nullable=True)            # 加班時數 (overtime hours)
+    night_hours = db.Column(db.Float, nullable=True)               # 夜班時數 (night-shift hours)
     description = db.Column(db.Text, nullable=False)                # work description
     notes = db.Column(db.Text, nullable=True)                       # notes
-    
+
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False) # relationship with Project
+
+# ==========================================
+# 1b. Schema Migration & Backup Helpers
+# ==========================================
+
+def ensure_task_columns():
+    """Lightweight migration: add new Task columns to an existing SQLite DB
+    if they don't already exist (db.create_all does not ALTER tables)."""
+    from sqlalchemy import text
+    new_columns = {
+        'day_hours': 'FLOAT',
+        'overtime_hours': 'FLOAT',
+        'night_hours': 'FLOAT',
+    }
+    with db.engine.connect() as conn:
+        existing = {row[1] for row in conn.execute(text('PRAGMA table_info(task)'))}
+        for col, col_type in new_columns.items():
+            if col not in existing:
+                conn.execute(text(f'ALTER TABLE task ADD COLUMN {col} {col_type}'))
+        conn.commit()
+
+
+def compute_back_url(default_endpoint='manage_db'):
+    """Return a safe 'back' URL based on the HTTP referrer so navigation always
+    re-fetches a fresh page (avoids the stale bfcache from history.back()).
+    Falls back to default_endpoint when the referrer is missing or points to
+    the current page (e.g. after a POST-redirect-GET to self)."""
+    from urllib.parse import urlparse
+    fallback = url_for(default_endpoint)
+    ref = request.referrer
+    if not ref:
+        return fallback
+    ref_path = urlparse(ref).path
+    if not ref_path or ref_path == request.path:
+        return fallback
+    return ref
+
+
+def parse_shift_hours(form):
+    """Parse the three optional shift-hour fields from a submitted form.
+    Returns (day_hours, overtime_hours, night_hours); blank/invalid -> None."""
+    def _num(key):
+        raw = (form.get(key) or '').strip()
+        if raw == '':
+            return None
+        try:
+            return float(raw)
+        except (ValueError, TypeError):
+            return None
+    return _num('day_hours'), _num('overtime_hours'), _num('night_hours')
+
+
+BACKUP_KEEP = 10  # number of automatic backups to retain
+
+def backup_database(reason='auto'):
+    """Copy the SQLite database file into instance/backups/ and prune old ones.
+    Returns the backup file path, or None if the DB file does not exist yet."""
+    import shutil
+    if not os.path.exists(db_file_path):
+        return None
+    backups_dir = os.path.join(instance_path, 'backups')
+    os.makedirs(backups_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    dest = os.path.join(backups_dir, f'app_{reason}_{timestamp}.db')
+    try:
+        shutil.copy2(db_file_path, dest)
+    except Exception as e:
+        print(f'備份失敗：{e}')
+        return None
+    # Prune: keep only the most recent BACKUP_KEEP files
+    try:
+        backups = sorted(
+            [f for f in os.listdir(backups_dir) if f.endswith('.db')],
+            key=lambda f: os.path.getmtime(os.path.join(backups_dir, f)),
+            reverse=True
+        )
+        for old in backups[BACKUP_KEEP:]:
+            os.remove(os.path.join(backups_dir, old))
+    except Exception as e:
+        print(f'清理舊備份失敗：{e}')
+    return dest
+
 
 # ==========================================
 # 2. Routes
@@ -172,12 +257,18 @@ def add_task():
             flash('工作天數格式錯誤', 'error')
             return redirect(url_for('add_task'))
 
+        # Parse optional shift hours (日班/加班/夜班)
+        day_hours, overtime_hours, night_hours = parse_shift_hours(request.form)
+
         # Create new Task object
         new_task = Task(
             personnel=personnel,
             project_id=int(project_id),
             date=task_date,
             work_days=work_days,
+            day_hours=day_hours,
+            overtime_hours=overtime_hours,
+            night_hours=night_hours,
             description=description,
             notes=notes
         )
@@ -194,7 +285,10 @@ def add_task():
 
     projects = Project.query.order_by(Project.name).all()
     personnel_list = [p.name for p in Personnel.query.order_by(Personnel.name).all()]
-    return render_template('add_task.html', projects=projects, personnel_list=personnel_list)
+    # #7: pre-select the employee when arriving from the employee page
+    prefill_person = request.args.get('person', '')
+    return render_template('add_task.html', projects=projects, personnel_list=personnel_list,
+                           prefill_person=prefill_person)
 
 # -----------------------------------------------------------------------------
 # Add Project Page: Form to create a new project
@@ -333,17 +427,30 @@ def manage_reps():
                 flash('✅ 業務代表已新增！', 'success')
             else:
                 flash('該業務代表已經存在！', 'error')
+        elif action == 'edit' and rep_id and rep_name:
+            rep = Representative.query.get(rep_id)
+            if rep:
+                old_name = rep.name
+                dup = Representative.query.filter(Representative.name == rep_name, Representative.id != rep.id).first()
+                if dup:
+                    flash('該業務代表名稱已存在！', 'error')
+                else:
+                    rep.name = rep_name
+                    # Keep projects in sync with the renamed representative
+                    Project.query.filter_by(rep=old_name).update({'rep': rep_name})
+                    db.session.commit()
+                    flash('✅ 業務代表已更新！', 'success')
         elif action == 'delete' and rep_id:
             rep = Representative.query.get(rep_id)
             if rep:
                 db.session.delete(rep)
                 db.session.commit()
                 flash('✅ 業務代表已刪除！', 'success')
-        
+
         return redirect(url_for('manage_reps'))
             
     reps = Representative.query.order_by(Representative.name).all()
-    return render_template('manage_reps.html', reps=reps)
+    return render_template('manage_reps.html', reps=reps, back_url=compute_back_url('add_proj'))
 
 # Helper function to validate file extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -381,8 +488,17 @@ def manage_personnel():
         elif action == 'edit' and p_id and name:
             p = Personnel.query.get(p_id)
             if p:
+                old_name = p.name
+                # Reject rename that collides with another existing person
+                dup = Personnel.query.filter(Personnel.name == name, Personnel.id != p.id).first()
+                if dup:
+                    flash('該系統代號已被其他人員使用！', 'error')
+                    return redirect(url_for('manage_personnel'))
                 p.name = name
                 p.display_name = display_name
+                # Cascade rename to all related work records (Task.personnel is stored as a string)
+                if old_name != name:
+                    Task.query.filter_by(personnel=old_name).update({'personnel': name})
                 # Handle avatar upload (overwrite existing)
                 file = request.files.get('avatar')
                 if file and file.filename != '' and allowed_file(file.filename):
@@ -390,7 +506,7 @@ def manage_personnel():
                     file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                     p.avatar_filename = filename
                 db.session.commit()
-                flash('✅ 人員資料已更新！', 'success')
+                flash('✅ 人員資料已更新！（相關工作紀錄已同步更新）', 'success')
                 
         elif action == 'delete' and p_id:
             p = Personnel.query.get(p_id)
@@ -407,7 +523,7 @@ def manage_personnel():
         return redirect(url_for('manage_personnel'))
             
     personnel_list = Personnel.query.order_by(Personnel.name).all()
-    return render_template('manage_personnel.html', personnel_list=personnel_list)
+    return render_template('manage_personnel.html', personnel_list=personnel_list, back_url=compute_back_url('manage_db'))
 
 # -----------------------------------------------------------------------------
 # Manage Categories: Add or delete project categories
@@ -426,17 +542,31 @@ def manage_categories():
                 flash('✅ 專案種類已新增！', 'success')
             else:
                 flash('該種類已經存在！', 'error')
+        elif action == 'edit' and cat_id and cat_name:
+            cat = Category.query.get(cat_id)
+            if cat:
+                old_name = cat.name
+                # Reject rename that collides with another existing category
+                dup = Category.query.filter(Category.name == cat_name, Category.id != cat.id).first()
+                if dup:
+                    flash('該種類名稱已存在！', 'error')
+                else:
+                    cat.name = cat_name
+                    # Keep projects in sync with the renamed category
+                    Project.query.filter_by(category=old_name).update({'category': cat_name})
+                    db.session.commit()
+                    flash('✅ 專案種類已更新！', 'success')
         elif action == 'delete' and cat_id:
             cat = Category.query.get(cat_id)
             if cat:
                 db.session.delete(cat)
                 db.session.commit()
                 flash('✅ 專案種類已刪除！', 'success')
-        
+
         return redirect(url_for('manage_categories'))
             
     categories = Category.query.order_by(Category.name).all()
-    return render_template('manage_categories.html', categories=categories)
+    return render_template('manage_categories.html', categories=categories, back_url=compute_back_url('manage_db'))
 
 # -----------------------------------------------------------------------------
 # Admin Authentication: Simple password protection for DB management
@@ -470,6 +600,80 @@ def manage_db():
     personnel_list = Personnel.query.order_by(Personnel.name).all()
     categories = Category.query.order_by(Category.name).all()
     return render_template('manage_db.html', projects=projects, tasks=tasks, reps=reps, personnel=personnel_list, categories=categories)
+
+# ==========================================
+# Database Backup (manual download + on-demand snapshot)
+# ==========================================
+@app.route('/api/backup-download')
+def backup_download():
+    """Download a fresh copy of the current SQLite database file."""
+    from flask import session, send_file
+    if not session.get('db_admin_auth'):
+        return redirect(url_for('manage_db_login'))
+    if not os.path.exists(db_file_path):
+        flash('找不到資料庫檔案', 'error')
+        return redirect(url_for('manage_db'))
+    download_name = f"app_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    return send_file(db_file_path, as_attachment=True, download_name=download_name)
+
+@app.route('/api/backup-now', methods=['POST'])
+def backup_now():
+    """Create an immediate backup snapshot into instance/backups/."""
+    from flask import session
+    if not session.get('db_admin_auth'):
+        flash('未授權，請先登入', 'error')
+        return redirect(url_for('manage_db_login'))
+    path = backup_database(reason='manual')
+    if path:
+        flash(f'✅ 已建立備份：{os.path.basename(path)}（最多保留 {BACKUP_KEEP} 份）', 'success')
+    else:
+        flash('備份失敗，找不到資料庫檔案', 'error')
+    return redirect(url_for('manage_db'))
+
+@app.route('/api/backup-restore', methods=['POST'])
+def backup_restore():
+    """Restore the database from an uploaded .db backup file.
+    The current database is snapshotted first (reason='pre_restore') so the
+    operation is reversible."""
+    import shutil
+    from flask import session
+    if not session.get('db_admin_auth'):
+        flash('未授權，請先登入', 'error')
+        return redirect(url_for('manage_db_login'))
+
+    file = request.files.get('db_file')
+    if not file or file.filename == '':
+        flash('請選擇備份檔案 (.db)', 'error')
+        return redirect(url_for('manage_db'))
+    if not file.filename.lower().endswith('.db'):
+        flash('檔案格式錯誤，請上傳 .db 備份檔', 'error')
+        return redirect(url_for('manage_db'))
+
+    # Validate it is a real SQLite database (magic header)
+    header = file.read(16)
+    file.seek(0)
+    if not header.startswith(b'SQLite format 3'):
+        flash('這不是有效的 SQLite 資料庫檔案', 'error')
+        return redirect(url_for('manage_db'))
+
+    # Snapshot the current DB so the restore can be undone
+    backup_database(reason='pre_restore')
+
+    # Release SQLAlchemy connections so the file can be replaced (Windows lock)
+    try:
+        db.session.remove()
+        db.engine.dispose()
+        tmp_path = db_file_path + '.incoming'
+        file.save(tmp_path)
+        shutil.move(tmp_path, db_file_path)
+        # Make sure any newly-restored older DB has the latest columns
+        ensure_task_columns()
+        flash('✅ 已從備份還原資料庫！（還原前的資料已另存為 pre_restore 備份）', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'還原失敗：{str(e)}', 'error')
+    return redirect(url_for('manage_db'))
+
 
 # ==========================================
 # Export / Import Project database
@@ -612,13 +816,16 @@ def export_tasks():
     output = io.StringIO()
     output.write('\ufeff')
     writer = csv.writer(output)
-    writer.writerow(['所屬專案', '人員', '日期', '工作天數', '工作描述', '備註'])
+    writer.writerow(['所屬專案', '人員', '日期', '工作天數', '日班時數', '加班時數', '夜班時數', '工作描述', '備註'])
     for t in tasks:
         writer.writerow([
             t.project.name if t.project else '',
             t.personnel,
             t.date.strftime('%Y/%m/%d') if t.date else '',
             t.work_days,
+            t.day_hours if t.day_hours is not None else '',
+            t.overtime_hours if t.overtime_hours is not None else '',
+            t.night_hours if t.night_hours is not None else '',
             t.description,
             t.notes or ''
         ])
@@ -661,8 +868,23 @@ def import_tasks():
             except ValueError:
                 error_list.append(f'第 {i} 行日期或工作天數格式錯誤，已略過')
                 continue
+
+            # Optional shift hours (blank -> None)
+            def _opt_hours(key):
+                raw = row.get(key, '').strip()
+                if raw == '':
+                    return None
+                try:
+                    return float(raw)
+                except ValueError:
+                    return None
+            day_h   = _opt_hours('日班時數')
+            ot_h    = _opt_hours('加班時數')
+            night_h = _opt_hours('夜班時數')
+
             db.session.add(Task(project_id=project.id, personnel=personnel,
                                 date=task_date, work_days=work_days,
+                                day_hours=day_h, overtime_hours=ot_h, night_hours=night_h,
                                 description=description, notes=notes))
             imported += 1
         db.session.commit()
@@ -884,6 +1106,9 @@ def edit_task(id):
             flash('工作天數格式錯誤', 'error')
             return redirect(url_for('edit_task', id=id, redirect_to=redirect_to))
 
+        # Optional shift hours (日班/加班/夜班)
+        task.day_hours, task.overtime_hours, task.night_hours = parse_shift_hours(request.form)
+
         try:
             db.session.commit()
             flash('✅ 工作紀錄已更新！', 'success')
@@ -1024,6 +1249,10 @@ def proj_timeline():
                 'width': t_width_percent,
                 'personnel': t.personnel,
                 'work_days': t.work_days,
+                'date': t.date.strftime('%Y/%m/%d') if t.date else '',
+                'day_hours': t.day_hours,
+                'overtime_hours': t.overtime_hours,
+                'night_hours': t.night_hours,
                 'desc': t.description
             })
 
@@ -1100,8 +1329,14 @@ def proj_timeline():
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
     with app.app_context():
+        # Back up the existing database before any schema changes run
+        backup_database(reason='startup')
+
         # Create all database tables
         db.create_all()
+
+        # Apply lightweight column migrations for pre-existing databases
+        ensure_task_columns()
 
         # Initialize default representatives if table is empty
         if not Representative.query.first():

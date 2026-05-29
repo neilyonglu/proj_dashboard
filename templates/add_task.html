@@ -50,9 +50,9 @@
                             <div class="relative">
                                 <select name="personnel" required
                                     class="form-input flex w-full appearance-none rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors">
-                                    <option value="" disabled selected hidden>請選擇參與人員</option>
+                                    <option value="" disabled {% if not prefill_person %}selected{% endif %} hidden>請選擇參與人員</option>
                                     {% for p in personnel_list %}
-                                    <option value="{{ p }}">{{ p }}</option>
+                                    <option value="{{ p }}" {% if prefill_person == p %}selected{% endif %}>{{ p }}</option>
                                     {% endfor %}
                                 </select>
                                 <div
@@ -105,6 +105,31 @@
                                         class="form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors" />
                                 </div>
                                 <span class="text-xs text-slate-400 mt-1">支援 0.5 天為單位</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Shift hours (optional) -->
+                    <div class="w-full">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-slate-700 dark:text-slate-300 text-sm font-semibold">時數明細</span>
+                            <span class="text-slate-400 font-normal text-xs">(選填，可與工作天數並存)</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <label class="flex flex-col">
+                                <span class="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">日班時數</span>
+                                <input type="number" name="day_hours" step="0.5" min="0" placeholder="例如：8"
+                                    class="form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-11 px-4 text-sm font-normal transition-colors" />
+                            </label>
+                            <label class="flex flex-col">
+                                <span class="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">加班時數</span>
+                                <input type="number" name="overtime_hours" step="0.5" min="0" placeholder="例如：2"
+                                    class="form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-11 px-4 text-sm font-normal transition-colors" />
+                            </label>
+                            <label class="flex flex-col">
+                                <span class="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">夜班時數</span>
+                                <input type="number" name="night_hours" step="0.5" min="0" placeholder="例如：0"
+                                    class="form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-11 px-4 text-sm font-normal transition-colors" />
                             </label>
                         </div>
                     </div>

@@ -13,7 +13,7 @@
                         <span
                             class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-sm">arrow_back</span>
                         <a class="text-sm text-slate-500 dark:text-slate-400 hover:text-primary transition-colors font-medium"
-                            href="{{ url_for('add_proj') }}">返回</a>
+                            href="{{ back_url }}">返回</a>
                     </div>
                     <h1 class="text-3xl font-bold leading-tight tracking-tight mt-4">管理業務代表</h1>
                     <p class="text-slate-500 dark:text-slate-400 mt-2 text-sm">新增或移除業務代表名單。此名單將用於所有專案的建立與編輯選項中。</p>
@@ -50,17 +50,37 @@
                     <ul
                         class="divide-y divide-slate-100 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                         {% for r in reps %}
-                        <li
-                            class="flex items-center justify-between p-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                            <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ r.name }}</span>
+                        <li class="bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                            <!-- View mode -->
+                            <div class="flex items-center justify-between p-4" id="rep-view-{{ r.id }}">
+                                <span class="text-sm font-medium text-slate-700 dark:text-slate-300">{{ r.name }}</span>
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="toggleRepEdit({{ r.id }}, true)"
+                                        class="text-blue-500 hover:bg-blue-50 p-2 rounded transition-colors" title="修改">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <form action="{{ url_for('manage_reps') }}" method="POST"
+                                        onsubmit="return confirm('確定要移除「{{ r.name }}」嗎？(已使用的專案不會受影響，但日後將無法從選單中選擇)');">
+                                        <input type="hidden" name="action" value="delete" />
+                                        <input type="hidden" name="rep_id" value="{{ r.id }}" />
+                                        <button type="submit" class="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
+                                            title="移除">
+                                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <!-- Edit mode -->
                             <form action="{{ url_for('manage_reps') }}" method="POST"
-                                onsubmit="return confirm('確定要移除「{{ r.name }}」嗎？(已使用的專案不會受影響，但日後將無法從選單中選擇)');">
-                                <input type="hidden" name="action" value="delete" />
+                                class="hidden items-center gap-2 p-4 bg-blue-50/50 dark:bg-blue-900/10" id="rep-edit-{{ r.id }}">
+                                <input type="hidden" name="action" value="edit" />
                                 <input type="hidden" name="rep_id" value="{{ r.id }}" />
-                                <button type="submit" class="text-red-500 hover:bg-red-50 p-2 rounded transition-colors"
-                                    title="移除">
-                                    <span class="material-symbols-outlined text-[18px]">delete</span>
-                                </button>
+                                <input name="rep_name" type="text" value="{{ r.name }}" required
+                                    class="form-input flex-1 rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 h-9 px-3 text-sm shadow-sm" />
+                                <button type="submit"
+                                    class="px-3 py-1.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm">儲存</button>
+                                <button type="button" onclick="toggleRepEdit({{ r.id }}, false)"
+                                    class="px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-600 bg-slate-200 hover:bg-slate-300">取消</button>
                             </form>
                         </li>
                         {% else %}
@@ -72,4 +92,23 @@
         </main>
     </div>
 </div>
+
+<script>
+    function toggleRepEdit(id, editing) {
+        const view = document.getElementById('rep-view-' + id);
+        const edit = document.getElementById('rep-edit-' + id);
+        if (!view || !edit) return;
+        if (editing) {
+            view.classList.add('hidden');
+            edit.classList.remove('hidden');
+            edit.classList.add('flex');
+            const input = edit.querySelector('input[name="rep_name"]');
+            if (input) { input.focus(); input.select(); }
+        } else {
+            edit.classList.add('hidden');
+            edit.classList.remove('flex');
+            view.classList.remove('hidden');
+        }
+    }
+</script>
 {% endblock %}

@@ -16,7 +16,28 @@
             </a>
         </div>
         <div class="flex items-center gap-2">
-            <span class="text-xs text-slate-400 hidden sm:inline" id="active-tab-label"></span>
+            <form action="{{ url_for('backup_now') }}" method="POST" class="inline">
+                <button type="submit"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
+                    title="立即建立一份資料庫備份（保留最近 10 份）">
+                    <span class="material-symbols-outlined text-[15px]">backup</span>立即備份
+                </button>
+            </form>
+            <a href="{{ url_for('backup_download') }}"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-primary hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+                title="下載目前資料庫檔案">
+                <span class="material-symbols-outlined text-[15px]">download</span>下載備份
+            </a>
+            <form action="{{ url_for('backup_restore') }}" method="POST" enctype="multipart/form-data" class="inline"
+                id="restore-form">
+                <input type="file" name="db_file" accept=".db" class="hidden" id="restore-file-input"
+                    onchange="if(this.files.length){ if(confirm('確定要用「'+this.files[0].name+'」還原資料庫嗎？\n\n目前的資料會先自動備份(pre_restore)，再被覆蓋。')){ document.getElementById('restore-form').submit(); } else { this.value=''; } }" />
+                <button type="button" onclick="document.getElementById('restore-file-input').click()"
+                    class="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors flex items-center gap-1.5 border border-amber-200"
+                    title="上傳 .db 備份檔以還原資料庫">
+                    <span class="material-symbols-outlined text-[15px]">restore</span>還原備份
+                </button>
+            </form>
         </div>
     </div>
 
@@ -275,6 +296,9 @@
                                 <th class="px-4 py-3 border-r border-slate-200">人員</th>
                                 <th class="px-4 py-3 border-r border-slate-200">日期</th>
                                 <th class="px-4 py-3 border-r border-slate-200">工作天數</th>
+                                <th class="px-4 py-3 border-r border-slate-200 text-center">日班</th>
+                                <th class="px-4 py-3 border-r border-slate-200 text-center">加班</th>
+                                <th class="px-4 py-3 border-r border-slate-200 text-center">夜班</th>
                                 <th class="px-4 py-3 border-r border-slate-200 min-w-[300px]">工作描述</th>
                                 <th class="px-4 py-3 border-r border-slate-200 min-w-[200px]">備註</th>
                                 <th class="px-4 py-3 w-[80px]">操作</th>
@@ -289,6 +313,9 @@
                                 <td class="px-4 py-3 search-field">{{ task.personnel }}</td>
                                 <td class="px-4 py-3 text-slate-500">{{ task.date.strftime('%Y/%m/%d') }}</td>
                                 <td class="px-4 py-3">{{ task.work_days }}</td>
+                                <td class="px-4 py-3 text-center text-slate-500">{{ task.day_hours if task.day_hours is not none else '-' }}</td>
+                                <td class="px-4 py-3 text-center text-slate-500">{{ task.overtime_hours if task.overtime_hours is not none else '-' }}</td>
+                                <td class="px-4 py-3 text-center text-slate-500">{{ task.night_hours if task.night_hours is not none else '-' }}</td>
                                 <td class="px-4 py-3 whitespace-normal">{{ task.description }}</td>
                                 <td class="px-4 py-3 text-slate-500 whitespace-normal">{{ task.notes or '' }}</td>
                                 <td class="px-4 py-3">
@@ -311,7 +338,7 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="8" class="px-4 py-8 text-center text-slate-500">目前沒有工作紀錄。</td>
+                                <td colspan="11" class="px-4 py-8 text-center text-slate-500">目前沒有工作紀錄。</td>
                             </tr>
                             {% endfor %}
                         </tbody>

@@ -1,0 +1,15 @@
+# Secrets / environment
+.env
+
+# Runtime data (database + auto backups + uploaded avatars are local)
+instance/
+
+# Python
+__pycache__/
+*.pyc
+
+# PyInstaller build artifacts
+build/
+build_tmp/
+dist/
+*.spec
