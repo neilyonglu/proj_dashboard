@@ -61,6 +61,14 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 
 db = SQLAlchemy(app) # Initialize SQLAlchemy database instance
 
+# Application version (shown in the UI top-right corner). Bump when releasing.
+APP_VERSION = '1.0'
+
+@app.context_processor
+def inject_app_version():
+    """Make app_version available to every template."""
+    return {'app_version': APP_VERSION}
+
 
 # ==========================================
 # 1. Tables' Definition (Database Models)
@@ -77,6 +85,7 @@ class Personnel(db.Model):
     name = db.Column(db.String(50), nullable=False, unique=True)    # personnel name
     display_name = db.Column(db.String(50), nullable=True)          # display name
     avatar_filename = db.Column(db.String(255), nullable=True)      # avatar image filename
+    resigned_date = db.Column(db.Date, nullable=True)              # 辭職日期 (None = 在職)
 
 # Category Table (專案種類表)
 class Category(db.Model):
@@ -131,6 +140,21 @@ def ensure_task_columns():
         for col, col_type in new_columns.items():
             if col not in existing:
                 conn.execute(text(f'ALTER TABLE task ADD COLUMN {col} {col_type}'))
+        conn.commit()
+
+
+def ensure_personnel_columns():
+    """Lightweight migration: add new Personnel columns to an existing SQLite DB
+    if they don't already exist (db.create_all does not ALTER tables)."""
+    from sqlalchemy import text
+    new_columns = {
+        'resigned_date': 'DATE',
+    }
+    with db.engine.connect() as conn:
+        existing = {row[1] for row in conn.execute(text('PRAGMA table_info(personnel)'))}
+        for col, col_type in new_columns.items():
+            if col not in existing:
+                conn.execute(text(f'ALTER TABLE personnel ADD COLUMN {col} {col_type}'))
         conn.commit()
 
 
@@ -284,7 +308,8 @@ def add_task():
             flash(f'發生錯誤：{str(e)}', 'error')
 
     projects = Project.query.order_by(Project.name).all()
-    personnel_list = [p.name for p in Personnel.query.order_by(Personnel.name).all()]
+    # Pass full objects so the form can show 辭職 markers (still selectable)
+    personnel_list = Personnel.query.order_by(Personnel.name).all()
     # #7: pre-select the employee when arriving from the employee page
     prefill_person = request.args.get('person', '')
     return render_template('add_task.html', projects=projects, personnel_list=personnel_list,
@@ -496,6 +521,15 @@ def manage_personnel():
                     return redirect(url_for('manage_personnel'))
                 p.name = name
                 p.display_name = display_name
+                # 辭職日期：留空代表在職，有值則記錄離職日
+                resigned_raw = (request.form.get('resigned_date') or '').strip()
+                if resigned_raw:
+                    try:
+                        p.resigned_date = datetime.strptime(resigned_raw, '%Y-%m-%d').date()
+                    except ValueError:
+                        flash('辭職日期格式錯誤，已略過該欄位', 'error')
+                else:
+                    p.resigned_date = None
                 # Cascade rename to all related work records (Task.personnel is stored as a string)
                 if old_name != name:
                     Task.query.filter_by(personnel=old_name).update({'personnel': name})
@@ -1118,7 +1152,8 @@ def edit_task(id):
             flash(f'更新失敗：{str(e)}', 'error')
 
     projects = Project.query.order_by(Project.name).all()
-    personnel_list = [p.name for p in Personnel.query.order_by(Personnel.name).all()]
+    # Pass full objects so the form can show 辭職 markers (still selectable)
+    personnel_list = Personnel.query.order_by(Personnel.name).all()
     return render_template('edit_task.html', task=task, projects=projects, personnel_list=personnel_list, redirect_to=redirect_to)
 
 # -----------------------------------------------------------------------------
@@ -1164,6 +1199,140 @@ def employee_case():
                            tasks=tasks,
                            total_days=total_days,
                            project_count=project_count)
+
+# -----------------------------------------------------------------------------
+# Overtime Stats: aggregate day/overtime/night (日班/加班/夜班) hours by
+# personnel and by project for a chosen period (day / month / year / range).
+# -----------------------------------------------------------------------------
+@app.route('/overtime-stats')
+def overtime_stats():
+    today = date.today()
+    granularity = request.args.get('granularity', 'month')
+    if granularity not in ('day', 'month', 'year', 'range'):
+        granularity = 'month'
+    period = (request.args.get('period') or '').strip()
+
+    # Defaults shared by the UI controls
+    period_value = ''
+    prev_value = next_value = ''
+    range_start_value = range_end_value = ''
+
+    # Resolve the date window plus the labels/values used by the UI.
+    # For day/month/year the window is [start, end); for a custom range it is
+    # inclusive of both endpoints, so we add one day to the end internally.
+    if granularity == 'day':
+        try:
+            d = datetime.strptime(period, '%Y-%m-%d').date()
+        except ValueError:
+            d = today
+        start, end = d, d + timedelta(days=1)
+        period_value = d.strftime('%Y-%m-%d')
+        period_label = d.strftime('%Y/%m/%d')
+        prev_value = (d - timedelta(days=1)).strftime('%Y-%m-%d')
+        next_value = (d + timedelta(days=1)).strftime('%Y-%m-%d')
+    elif granularity == 'year':
+        try:
+            y = int(period)
+        except (ValueError, TypeError):
+            y = today.year
+        start, end = date(y, 1, 1), date(y + 1, 1, 1)
+        period_value = str(y)
+        period_label = f'{y} 年'
+        prev_value = str(y - 1)
+        next_value = str(y + 1)
+    elif granularity == 'range':
+        def _parse(s, fallback):
+            try:
+                return datetime.strptime(s, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                return fallback
+        s_raw = (request.args.get('start') or '').strip()
+        e_raw = (request.args.get('end') or '').strip()
+        rs = _parse(s_raw, date(today.year, today.month, 1))
+        re_ = _parse(e_raw, today)
+        if re_ < rs:                       # swap if the user picked them reversed
+            rs, re_ = re_, rs
+        start, end = rs, re_ + timedelta(days=1)   # inclusive of the end day
+        range_start_value = rs.strftime('%Y-%m-%d')
+        range_end_value = re_.strftime('%Y-%m-%d')
+        period_label = f'{rs.strftime("%Y/%m/%d")} ~ {re_.strftime("%Y/%m/%d")}'
+    else:  # month
+        try:
+            yy, mm = period.split('-')
+            y, m = int(yy), int(mm)
+            date(y, m, 1)  # validate
+        except (ValueError, TypeError):
+            y, m = today.year, today.month
+        start = date(y, m, 1)
+        end = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
+        period_value = f'{y:04d}-{m:02d}'
+        period_label = f'{y}/{m:02d}'
+        pm_y, pm_m = (y - 1, 12) if m == 1 else (y, m - 1)
+        nm_y, nm_m = (y + 1, 1) if m == 12 else (y, m + 1)
+        prev_value = f'{pm_y:04d}-{pm_m:02d}'
+        next_value = f'{nm_y:04d}-{nm_m:02d}'
+
+    tasks = Task.query.filter(Task.date >= start, Task.date < end).all()
+
+    # Display-name lookup so the report shows friendly names
+    name_map = {p.name: (p.display_name or p.name) for p in Personnel.query.all()}
+
+    by_personnel = {}
+    by_project = {}
+    total_day = 0.0
+    total_overtime = 0.0
+    total_night = 0.0
+    record_count = 0
+
+    for t in tasks:
+        dh = t.day_hours or 0
+        ot = t.overtime_hours or 0
+        nt = t.night_hours or 0
+        # Only count rows that carry any shift hours (日班/加班/夜班)
+        if dh == 0 and ot == 0 and nt == 0:
+            continue
+        total_day += dh
+        total_overtime += ot
+        total_night += nt
+        record_count += 1
+
+        prec = by_personnel.setdefault(t.personnel, {
+            'name': t.personnel,
+            'display_name': name_map.get(t.personnel, t.personnel),
+            'day': 0.0, 'overtime': 0.0, 'night': 0.0, 'count': 0})
+        prec['day'] += dh
+        prec['overtime'] += ot
+        prec['night'] += nt
+        prec['count'] += 1
+
+        pname = t.project.name if t.project else '（未知專案）'
+        jrec = by_project.setdefault(pname, {
+            'name': pname, 'day': 0.0, 'overtime': 0.0, 'night': 0.0, 'count': 0})
+        jrec['day'] += dh
+        jrec['overtime'] += ot
+        jrec['night'] += nt
+        jrec['count'] += 1
+
+    personnel_stats = sorted(by_personnel.values(),
+                             key=lambda r: (r['overtime'], r['night'], r['day']), reverse=True)
+    project_stats = sorted(by_project.values(),
+                           key=lambda r: (r['overtime'], r['night'], r['day']), reverse=True)
+
+    return render_template('overtime_stats.html',
+                           granularity=granularity,
+                           period_value=period_value,
+                           period_label=period_label,
+                           prev_value=prev_value,
+                           next_value=next_value,
+                           range_start_value=range_start_value,
+                           range_end_value=range_end_value,
+                           personnel_stats=personnel_stats,
+                           project_stats=project_stats,
+                           total_day=total_day,
+                           total_overtime=total_overtime,
+                           total_night=total_night,
+                           record_count=record_count)
+
 
 # -----------------------------------------------------------------------------
 # Project Timeline: Gantt chart view of all projects
@@ -1311,10 +1480,15 @@ def proj_timeline():
             
         current_date = next_date
 
-    return render_template('proj_timeline.html', 
-                           projects=projects, 
+    # Map of resigned personnel name -> resignation date string (for 註記)
+    resigned_map = {p.name: p.resigned_date.strftime('%Y/%m/%d')
+                    for p in Personnel.query.filter(Personnel.resigned_date.isnot(None)).all()}
+
+    return render_template('proj_timeline.html',
+                           projects=projects,
                            timeline_data=timeline_data,
                            time_markers=time_markers,
+                           resigned_map=resigned_map,
                            timeline_start=timeline_start,
                            timeline_end=timeline_end,
                            default_left_pct=default_left_pct,
@@ -1337,6 +1511,7 @@ if __name__ == '__main__':
 
         # Apply lightweight column migrations for pre-existing databases
         ensure_task_columns()
+        ensure_personnel_columns()
 
         # Initialize default representatives if table is empty
         if not Representative.query.first():

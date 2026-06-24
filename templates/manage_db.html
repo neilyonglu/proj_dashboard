@@ -177,9 +177,17 @@
         <!-- Projects Table -->
         <div id="db-view-projects">
             <div class="mb-4 flex items-center gap-3">
-                <input type="text" id="search-projects" onkeyup="searchTable('projects')"
+                <input type="text" id="search-projects" onkeyup="filterProjects()"
                     class="form-input rounded-lg border-slate-300 bg-white h-9 px-4 text-sm shadow-sm w-[300px]"
                     placeholder="搜尋專案名稱...">
+                <select id="filter-projects-status" onchange="filterProjects()"
+                    class="form-select rounded-lg border-slate-300 bg-white h-9 pl-3 pr-8 text-sm shadow-sm">
+                    <option value="">全部狀態</option>
+                    <option value="進行中">進行中</option>
+                    <option value="等待中">等待中</option>
+                    <option value="暫緩中">暫緩中</option>
+                    <option value="已結案">已結案</option>
+                </select>
                 <div class="ml-auto flex items-center gap-2">
                     <button onclick="openImportModal('專案', '{{ url_for('import_db') }}', true, '覆蓋同名專案的資料（工作紀錄不受影響）')"
                         class="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-primary hover:bg-primary/90 transition-colors flex items-center gap-1.5">
@@ -210,7 +218,7 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
                             {% for proj in projects %}
-                            <tr class="hover:bg-slate-50 transition-colors align-top searchable-row">
+                            <tr class="hover:bg-slate-50 transition-colors align-top searchable-row" data-status="{{ proj.status }}">
                                 <td class="px-4 py-3 text-slate-400 font-mono text-xs">{{ proj.id }}</td>
                                 <td class="px-4 py-3 font-medium text-slate-900 search-field">{{ proj.name }}</td>
                                 <td class="px-4 py-3">
@@ -578,6 +586,20 @@
         document.getElementById('db-btn-' + tabId).className = "flex items-center gap-2 pb-2 text-sm font-bold text-primary border-b-2 border-primary -mb-[9px] transition-colors";
         const activeBadge = document.getElementById('db-btn-' + tabId).querySelector('span:last-child');
         if (activeBadge) activeBadge.className = 'bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full';
+    }
+
+    // ── Projects: combined text search + status filter ───────────────
+    function filterProjects() {
+        const input = document.getElementById('search-projects').value.toLowerCase();
+        const status = document.getElementById('filter-projects-status').value;
+        const rows = document.querySelectorAll('#table-projects .searchable-row');
+        rows.forEach(row => {
+            const fields = row.querySelectorAll('.search-field');
+            let textMatch = (input === '');
+            fields.forEach(f => { if (f.textContent.toLowerCase().includes(input)) textMatch = true; });
+            const statusMatch = (status === '' || row.dataset.status === status);
+            row.style.display = (textMatch && statusMatch) ? '' : 'none';
+        });
     }
 
     // ── Search ──────────────────────────────────────────────────────

@@ -47,18 +47,15 @@
                                     <span class="material-symbols-outlined text-[14px]">settings</span>管理名單
                                 </a>
                             </div>
-                            <div class="relative">
-                                <select name="personnel" required
-                                    class="form-input flex w-full appearance-none rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors">
-                                    <option value="" disabled hidden>請選擇參與人員</option>
+                            <div class="relative" data-combobox data-required>
+                                <input type="hidden" name="personnel" value="{{ task.personnel }}">
+                                <input type="text" class="combo-input form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors"
+                                    placeholder="輸入關鍵字篩選或點選參與人員" autocomplete="off">
+                                <ul class="combo-list hidden">
                                     {% for p in personnel_list %}
-                                    <option value="{{ p }}" {% if task.personnel == p %}selected{% endif %}>{{ p }}</option>
+                                    <li class="combo-option" data-value="{{ p.name }}" data-label="{{ p.name }}">{{ p.name }}{% if p.resigned_date %} <span class="text-rose-500 text-xs">已辭職 {{ p.resigned_date.strftime('%Y/%m/%d') }}</span>{% endif %}</li>
                                     {% endfor %}
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                                    <span class="material-symbols-outlined text-xl">expand_more</span>
-                                </div>
+                                </ul>
                             </div>
                         </label>
                     </div>
@@ -67,18 +64,15 @@
                         <label class="flex flex-col">
                             <span class="text-slate-700 dark:text-slate-300 text-sm font-semibold mb-1">專案列表
                                 <span class="text-red-500">*</span></span>
-                            <div class="relative">
-                                <select name="project_id" required
-                                    class="form-input flex w-full appearance-none rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors">
-                                    <option value="" disabled hidden>請選擇專案</option>
+                            <div class="relative" data-combobox data-required>
+                                <input type="hidden" name="project_id" value="{{ task.project_id }}">
+                                <input type="text" class="combo-input form-input flex w-full rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-4 text-sm font-normal transition-colors"
+                                    placeholder="輸入關鍵字篩選或點選專案" autocomplete="off">
+                                <ul class="combo-list hidden">
                                     {% for proj in projects %}
-                                    <option value="{{ proj.id }}" {% if proj.id == task.project_id %}selected{% endif %}>{{ proj.name }}</option>
+                                    <li class="combo-option" data-value="{{ proj.id }}" data-label="{{ proj.name }}">{{ proj.name }}</li>
                                     {% endfor %}
-                                </select>
-                                <div
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                                    <span class="material-symbols-outlined text-xl">expand_more</span>
-                                </div>
+                                </ul>
                             </div>
                         </label>
                     </div>

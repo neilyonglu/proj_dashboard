@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+
+{% block title %}加班統計 - 專案管理系統{% endblock %}
+
+{% block content %}
+<div class="layout-container flex min-h-screen grow flex-col bg-slate-50">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('index') }}" class="text-slate-400 hover:text-slate-600 transition-colors" title="返回首頁">
+                <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+            </a>
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-[22px] text-primary">more_time</span>
+                <h2 class="text-slate-900 text-lg font-bold leading-tight">加班統計</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-auto p-6 w-full max-w-[1100px] mx-auto">
+        <!-- Period controls -->
+        <form method="GET" action="{{ url_for('overtime_stats') }}" id="ot-form"
+            class="mb-6 flex flex-wrap items-center gap-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <label class="text-sm font-medium text-slate-600">統計區間</label>
+            <select name="granularity" onchange="this.form.submit()"
+                class="form-select rounded-lg border-slate-300 bg-white h-9 pl-3 pr-8 text-sm shadow-sm">
+                <option value="day" {% if granularity=='day' %}selected{% endif %}>依日</option>
+                <option value="month" {% if granularity=='month' %}selected{% endif %}>依月</option>
+                <option value="year" {% if granularity=='year' %}selected{% endif %}>依年</option>
+                <option value="range" {% if granularity=='range' %}selected{% endif %}>自訂區間</option>
+            </select>
+
+            {% if granularity == 'range' %}
+            <div class="flex items-center gap-2">
+                <input type="date" name="start" value="{{ range_start_value }}"
+                    class="form-input rounded-lg border-slate-300 bg-white h-9 px-3 text-sm shadow-sm">
+                <span class="text-slate-400 text-sm">~</span>
+                <input type="date" name="end" value="{{ range_end_value }}"
+                    class="form-input rounded-lg border-slate-300 bg-white h-9 px-3 text-sm shadow-sm">
+                <button type="submit"
+                    class="h-9 px-4 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-colors">查詢</button>
+            </div>
+            {% else %}
+            <div class="flex items-center gap-1">
+                <a href="{{ url_for('overtime_stats', granularity=granularity, period=prev_value) }}"
+                    class="size-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                    title="上一個區間">
+                    <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                </a>
+                {% if granularity == 'day' %}
+                <input type="date" name="period" value="{{ period_value }}"
+                    onchange="this.form.submit()"
+                    class="form-input rounded-lg border-slate-300 bg-white h-9 px-3 text-sm shadow-sm">
+                {% elif granularity == 'year' %}
+                <input type="number" name="period" value="{{ period_value }}" min="2000" max="2100"
+                    onchange="this.form.submit()"
+                    class="form-input rounded-lg border-slate-300 bg-white h-9 px-3 text-sm shadow-sm w-[110px]">
+                {% else %}
+                <input type="month" name="period" value="{{ period_value }}"
+                    onchange="this.form.submit()"
+                    class="form-input rounded-lg border-slate-300 bg-white h-9 px-3 text-sm shadow-sm">
+                {% endif %}
+                <a href="{{ url_for('overtime_stats', granularity=granularity, period=next_value) }}"
+                    class="size-9 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 transition-colors"
+                    title="下一個區間">
+                    <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                </a>
+            </div>
+            {% endif %}
+            <span class="text-sm text-slate-400 ml-1">目前顯示：<span class="font-semibold text-slate-700">{{ period_label }}</span></span>
+        </form>
+
+        <!-- Summary cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-full bg-sky-50 text-sky-600">
+                    <span class="material-symbols-outlined text-2xl">light_mode</span>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-slate-500">日班總時數</div>
+                    <div class="text-2xl font-bold text-slate-900">{{ '%g'|format(total_day) }} <span class="text-base font-medium text-slate-400">小時</span></div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-full bg-amber-50 text-amber-600">
+                    <span class="material-symbols-outlined text-2xl">more_time</span>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-slate-500">加班總時數</div>
+                    <div class="text-2xl font-bold text-slate-900">{{ '%g'|format(total_overtime) }} <span class="text-base font-medium text-slate-400">小時</span></div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-full bg-indigo-50 text-indigo-600">
+                    <span class="material-symbols-outlined text-2xl">bedtime</span>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-slate-500">夜班總時數</div>
+                    <div class="text-2xl font-bold text-slate-900">{{ '%g'|format(total_night) }} <span class="text-base font-medium text-slate-400">小時</span></div>
+                </div>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-center gap-4">
+                <div class="p-3 rounded-full bg-slate-100 text-slate-600">
+                    <span class="material-symbols-outlined text-2xl">receipt_long</span>
+                </div>
+                <div>
+                    <div class="text-sm font-medium text-slate-500">有時數筆數</div>
+                    <div class="text-2xl font-bold text-slate-900">{{ record_count }} <span class="text-base font-medium text-slate-400">筆</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail tables -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- By personnel -->
+            <div class="border border-slate-200 rounded-xl shadow-sm overflow-hidden bg-white">
+                <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-primary">group</span>
+                    <h3 class="text-sm font-bold text-slate-800">依人員統計</h3>
+                </div>
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[13px] font-semibold">
+                            <th class="px-4 py-2.5">人員</th>
+                            <th class="px-4 py-2.5 text-right">日班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">加班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">夜班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">筆數</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        {% for r in personnel_stats %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-2.5 font-medium text-slate-900">{{ r.display_name }}</td>
+                            <td class="px-4 py-2.5 text-right text-sky-700">{{ '%g'|format(r.day) }}</td>
+                            <td class="px-4 py-2.5 text-right font-semibold text-amber-700">{{ '%g'|format(r.overtime) }}</td>
+                            <td class="px-4 py-2.5 text-right text-indigo-700">{{ '%g'|format(r.night) }}</td>
+                            <td class="px-4 py-2.5 text-right text-slate-500">{{ r.count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">此區間沒有時數紀錄。</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- By project -->
+            <div class="border border-slate-200 rounded-xl shadow-sm overflow-hidden bg-white">
+                <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-primary">folder</span>
+                    <h3 class="text-sm font-bold text-slate-800">依專案統計</h3>
+                </div>
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-[13px] font-semibold">
+                            <th class="px-4 py-2.5">專案</th>
+                            <th class="px-4 py-2.5 text-right">日班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">加班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">夜班(小時)</th>
+                            <th class="px-4 py-2.5 text-right">筆數</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-700">
+                        {% for r in project_stats %}
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-2.5 font-medium text-slate-900">{{ r.name }}</td>
+                            <td class="px-4 py-2.5 text-right text-sky-700">{{ '%g'|format(r.day) }}</td>
+                            <td class="px-4 py-2.5 text-right font-semibold text-amber-700">{{ '%g'|format(r.overtime) }}</td>
+                            <td class="px-4 py-2.5 text-right text-indigo-700">{{ '%g'|format(r.night) }}</td>
+                            <td class="px-4 py-2.5 text-right text-slate-500">{{ r.count }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">此區間沒有時數紀錄。</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

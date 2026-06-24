@@ -13,3 +13,6 @@ build/
 build_tmp/
 dist/
 *.spec
+
+# CodeGraph local index (not for version control)
+.codegraph/

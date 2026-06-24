@@ -110,3 +110,43 @@ select.form-input {
 .rep-badge {
     @apply px-2 py-1 bg-blue-50 text-blue-700 rounded border border-blue-200 text-xs;
 }
+
+/* =========================================
+   Searchable combobox (打字篩選下拉)
+   ========================================= */
+.combo-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 40;
+    max-height: 260px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    padding: 4px;
+}
+
+.dark .combo-list {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+.combo-option {
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    color: #0f172a;
+}
+
+.dark .combo-option {
+    color: #e2e8f0;
+}
+
+.combo-option:hover,
+.combo-option.combo-active {
+    background: rgba(59, 130, 246, .12);
+}
