@@ -29,7 +29,17 @@
 
 ```text
 proj_dashboard/
-├── app.py                 # 應用程式主程式與所有路由邏輯
+├── app.py                 # 應用程式進入點（Flask 初始化、設定、啟動）
+├── core/                  # 核心應用模組
+│   ├── extensions.py      # SQLAlchemy db 實例
+│   ├── models.py          # 資料庫模型（Project, Task, Personnel, ...）
+│   ├── helpers.py         # 工具函式（備份、Migration、表單解析）
+│   └── routes/            # 路由模組
+│       ├── main.py        # 儀表板、時間軸、員工頁、加班統計
+│       ├── projects.py    # 專案 CRUD
+│       ├── tasks.py       # 工時紀錄 CRUD
+│       ├── admin.py       # 後台登入、備份 API、CSV 匯出/匯入
+│       └── manage.py      # 人員、代表、分類管理
 ├── build.bat              # Windows 打包執行檔腳本 (PyInstaller)
 ├── build.sh               # Bash 打包執行檔腳本 (PyInstaller)
 ├── .env                   # 環境變數設定檔 (需手動建立, 已被 .gitignore 排除)

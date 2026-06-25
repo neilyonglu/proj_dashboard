@@ -1,26 +1,19 @@
 @echo off
 echo Starting build process...
 
-REM 1. Create a temporary folder named proj_dash
-if not exist proj_dash mkdir proj_dash
-
-REM 2. Copy app.py to the folder
-copy /Y app.py proj_dash\
-
-REM Enter the folder
-cd proj_dash
-
-REM 3. Package app.py using pyinstaller (without html/static)
+REM Run PyInstaller from the project root so the core/ package is included
 pyinstaller --onefile --name "proj_dash" app.py
 
-REM Move the packaged exe out to the parent directory
-move /Y dist\proj_dash.exe ..\proj_dash.exe
+REM Move the built exe to the project root
+if exist dist\proj_dash.exe (
+    move /Y dist\proj_dash.exe proj_dash.exe
+    echo Build completed! The executable is proj_dash.exe
+) else (
+    echo Build failed.
+)
 
-REM Go back to the parent directory
-cd ..
+REM Clean up PyInstaller artifacts
+if exist dist rmdir /S /Q dist
+if exist build rmdir /S /Q build
 
-REM 4. Delete the temporary folder
-rmdir /S /Q proj_dash
-
-echo Build completed! The executable is proj_dash.exe
 pause

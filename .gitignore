@@ -1,6 +1,12 @@
 # Secrets / environment
 .env
 
+# Claude Code project instructions (local only)
+CLAUDE.md
+
+# Build output
+*.exe
+
 # Runtime data (database + auto backups + uploaded avatars are local)
 instance/
 
