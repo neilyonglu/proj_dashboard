@@ -69,7 +69,7 @@ def parse_shift_hours(form):
     return _num('day_hours'), _num('overtime_hours'), _num('night_hours')
 
 
-def backup_database(reason='auto'):
+def backup_database(reason='auto', once_per_day=False):
     """Copy the SQLite DB into instance/backups/ and prune old copies."""
     db_file_path = current_app.config['DB_FILE_PATH']
     instance_dir = current_app.config['DB_INSTANCE_DIR']
@@ -77,6 +77,12 @@ def backup_database(reason='auto'):
         return None
     backups_dir = os.path.join(instance_dir, 'backups')
     os.makedirs(backups_dir, exist_ok=True)
+    today = datetime.now().strftime('%Y%m%d')
+    if once_per_day:
+        already = [f for f in os.listdir(backups_dir) if f.endswith('.db') and today in f]
+        if already:
+            print(f'今日已有備份，略過本次備份。')
+            return None
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     dest = os.path.join(backups_dir, f'app_{reason}_{timestamp}.db')
     try:

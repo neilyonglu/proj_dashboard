@@ -61,7 +61,7 @@ if __name__ == '__main__':
     from core.models import Representative, Category, Personnel, Task
 
     with app.app_context():
-        backup_database(reason='startup')
+        backup_database(reason='startup', once_per_day=True)
         db.create_all()
         ensure_task_columns()
         ensure_personnel_columns()
