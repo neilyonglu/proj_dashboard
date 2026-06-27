@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, session
 from ..extensions import db
 from ..models import Project, Representative, Category
+from ..activity_log import log_action
 
 
 def register(app):
@@ -41,6 +42,8 @@ def register(app):
                 if category and not Category.query.filter_by(name=category).first():
                     db.session.add(Category(name=category))
                 db.session.commit()
+                log_action(request.remote_addr, '新增專案',
+                           f'name={name}, status={status}, rep={rep}')
                 flash('✅ 專案已新增！', 'success')
                 return redirect(url_for('proj_timeline'))
             except Exception as e:
@@ -78,6 +81,8 @@ def register(app):
                 if project.category and not Category.query.filter_by(name=project.category).first():
                     db.session.add(Category(name=project.category))
                 db.session.commit()
+                log_action(request.remote_addr, '編輯專案',
+                           f'project_id={id}, name={project.name}, status={project.status}')
                 flash('✅ 專案已更新！', 'success')
                 return redirect(url_for('proj_timeline'))
             except Exception as e:
@@ -90,10 +95,16 @@ def register(app):
 
     @app.route('/delete-project/<int:id>', methods=['POST'])
     def delete_project(id):
+        if not session.get('db_admin_auth'):
+            log_action(request.remote_addr, '刪除專案（未授權）', f'project_id={id}')
+            flash('僅管理者可刪除專案', 'error')
+            return redirect(url_for('manage_db'))
         project = Project.query.get_or_404(id)
         try:
+            detail = f'project_id={id}, name={project.name}'
             db.session.delete(project)
             db.session.commit()
+            log_action(request.remote_addr, '刪除專案', detail)
             flash('✅ 專案已刪除！', 'success')
         except Exception as e:
             db.session.rollback()

@@ -45,7 +45,7 @@ app.config['DB_ADMIN_PASSWORD'] = os.environ.get('DB_ADMIN_PASSWORD', 'admin123'
 from core.extensions import db
 db.init_app(app)
 
-APP_VERSION = '1.0.1'
+APP_VERSION = '1.1.0'
 
 @app.context_processor
 def inject_app_version():

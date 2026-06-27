@@ -1,9 +1,10 @@
 from datetime import datetime
 
-from flask import render_template, request, redirect, url_for, flash
+from flask import render_template, request, redirect, url_for, flash, session
 from ..extensions import db
 from ..models import Task, Project, Personnel
 from ..helpers import parse_shift_hours
+from ..activity_log import log_action
 
 
 def register(app):
@@ -41,6 +42,10 @@ def register(app):
             try:
                 db.session.add(new_task)
                 db.session.commit()
+                proj = Project.query.get(int(project_id))
+                proj_name = proj.name if proj else project_id
+                log_action(request.remote_addr, '新增工作紀錄',
+                           f'personnel={personnel}, project={proj_name}, date={date_str}, days={work_days}')
                 flash('✅ 工作紀錄已新增！', 'success')
                 return redirect(url_for('employee_case', person=personnel))
             except Exception as e:
@@ -82,6 +87,8 @@ def register(app):
             task.day_hours, task.overtime_hours, task.night_hours = parse_shift_hours(request.form)
             try:
                 db.session.commit()
+                log_action(request.remote_addr, '編輯工作紀錄',
+                           f'task_id={id}, personnel={task.personnel}, date={date_str}')
                 flash('✅ 工作紀錄已更新！', 'success')
                 return redirect(redirect_to)
             except Exception as e:
@@ -95,11 +102,18 @@ def register(app):
 
     @app.route('/delete-task/<int:id>', methods=['POST'])
     def delete_task(id):
+        if not session.get('db_admin_auth'):
+            log_action(request.remote_addr, '刪除工作紀錄（未授權）', f'task_id={id}')
+            flash('僅管理者可刪除工作紀錄', 'error')
+            redirect_to = request.form.get('redirect_to', url_for('manage_db'))
+            return redirect(redirect_to)
         task = Task.query.get_or_404(id)
         redirect_to = request.form.get('redirect_to', url_for('manage_db'))
         try:
+            detail = f'task_id={id}, personnel={task.personnel}, date={task.date}'
             db.session.delete(task)
             db.session.commit()
+            log_action(request.remote_addr, '刪除工作紀錄', detail)
             flash('✅ 工作紀錄已刪除！', 'success')
         except Exception as e:
             db.session.rollback()

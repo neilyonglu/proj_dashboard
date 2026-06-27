@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from flask import render_template, request
+from flask import render_template, request, session
 from ..models import Project, Task, Personnel
 
 
@@ -18,7 +18,8 @@ def register(app):
         return render_template('index.html',
                                active_projects=active_projects_count,
                                total_personnel=total_personnel,
-                               monthly_work_days=monthly_work_days)
+                               monthly_work_days=monthly_work_days,
+                               is_admin=bool(session.get('db_admin_auth')))
 
     @app.route('/employee-case')
     def employee_case():
@@ -41,7 +42,8 @@ def register(app):
                                avatar_filename=selected_p.avatar_filename,
                                tasks=tasks,
                                total_days=sum(t.work_days for t in tasks),
-                               project_count=len(set(t.project_id for t in tasks)))
+                               project_count=len(set(t.project_id for t in tasks)),
+                               is_admin=bool(session.get('db_admin_auth')))
 
     @app.route('/overtime-stats')
     def overtime_stats():

@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from ..extensions import db
 from ..models import Representative, Personnel, Category, Task, Project
 from ..helpers import compute_back_url, allowed_file
+from ..activity_log import log_action
 
 
 def register(app):
@@ -20,6 +21,7 @@ def register(app):
                 if not Representative.query.filter_by(name=rep_name).first():
                     db.session.add(Representative(name=rep_name))
                     db.session.commit()
+                    log_action(request.remote_addr, '新增業務代表', rep_name)
                     flash('✅ 業務代表已新增！', 'success')
                 else:
                     flash('該業務代表已經存在！', 'error')
@@ -35,12 +37,15 @@ def register(app):
                         rep.name = rep_name
                         Project.query.filter_by(rep=old_name).update({'rep': rep_name})
                         db.session.commit()
+                        log_action(request.remote_addr, '編輯業務代表', f'{old_name} → {rep_name}')
                         flash('✅ 業務代表已更新！', 'success')
             elif action == 'delete' and rep_id:
                 rep = Representative.query.get(rep_id)
                 if rep:
+                    name = rep.name
                     db.session.delete(rep)
                     db.session.commit()
+                    log_action(request.remote_addr, '刪除業務代表', name)
                     flash('✅ 業務代表已刪除！', 'success')
 
             return redirect(url_for('manage_reps'))
@@ -66,6 +71,7 @@ def register(app):
                         new_p.avatar_filename = filename
                     db.session.add(new_p)
                     db.session.commit()
+                    log_action(request.remote_addr, '新增人員', f'name={name}, display={display_name}')
                     flash('✅ 人員已新增！', 'success')
                 else:
                     flash('該人員已經存在！', 'error')
@@ -97,6 +103,8 @@ def register(app):
                         file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
                         p.avatar_filename = filename
                     db.session.commit()
+                    log_action(request.remote_addr, '編輯人員',
+                               f'{old_name} → {name}, display={display_name}')
                     flash('✅ 人員資料已更新！（相關工作紀錄已同步更新）', 'success')
 
             elif action == 'delete' and p_id:
@@ -106,8 +114,10 @@ def register(app):
                         filepath = os.path.join(app.config['UPLOAD_FOLDER'], p.avatar_filename)
                         if os.path.exists(filepath):
                             os.remove(filepath)
+                    pname = p.name
                     db.session.delete(p)
                     db.session.commit()
+                    log_action(request.remote_addr, '刪除人員', pname)
                     flash('✅ 人員已刪除！', 'success')
 
             return redirect(url_for('manage_personnel'))
@@ -127,6 +137,7 @@ def register(app):
                 if not Category.query.filter_by(name=cat_name).first():
                     db.session.add(Category(name=cat_name))
                     db.session.commit()
+                    log_action(request.remote_addr, '新增專案種類', cat_name)
                     flash('✅ 專案種類已新增！', 'success')
                 else:
                     flash('該種類已經存在！', 'error')
@@ -142,12 +153,15 @@ def register(app):
                         cat.name = cat_name
                         Project.query.filter_by(category=old_name).update({'category': cat_name})
                         db.session.commit()
+                        log_action(request.remote_addr, '編輯專案種類', f'{old_name} → {cat_name}')
                         flash('✅ 專案種類已更新！', 'success')
             elif action == 'delete' and cat_id:
                 cat = Category.query.get(cat_id)
                 if cat:
+                    name = cat.name
                     db.session.delete(cat)
                     db.session.commit()
+                    log_action(request.remote_addr, '刪除專案種類', name)
                     flash('✅ 專案種類已刪除！', 'success')
 
             return redirect(url_for('manage_categories'))

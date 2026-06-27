@@ -16,4 +16,3 @@ REM Clean up PyInstaller artifacts
 if exist dist rmdir /S /Q dist
 if exist build rmdir /S /Q build
 
-pause

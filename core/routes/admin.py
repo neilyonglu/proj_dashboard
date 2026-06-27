@@ -8,6 +8,7 @@ from flask import render_template, request, redirect, url_for, flash, session, s
 from ..extensions import db
 from ..models import Project, Task, Personnel, Representative, Category
 from ..helpers import backup_database, ensure_task_columns, BACKUP_KEEP
+from ..activity_log import log_action
 
 
 def _require_auth():
@@ -27,7 +28,9 @@ def register(app):
         if request.method == 'POST':
             if request.form.get('password', '') == DB_ADMIN_PASSWORD:
                 session['db_admin_auth'] = True
+                log_action(request.remote_addr, '管理者登入成功')
                 return redirect(url_for('manage_db'))
+            log_action(request.remote_addr, '管理者登入失敗（密碼錯誤）')
             flash('密碼錯誤，請重新輸入', 'error')
             return redirect(url_for('manage_db_login'))
         return render_template('manage_db_login.html')
@@ -66,6 +69,7 @@ def register(app):
             return redirect(url_for('manage_db_login'))
         path = backup_database(reason='manual')
         if path:
+            log_action(request.remote_addr, '手動備份資料庫', os.path.basename(path))
             flash(f'✅ 已建立備份：{os.path.basename(path)}（最多保留 {BACKUP_KEEP} 份）', 'success')
         else:
             flash('備份失敗，找不到資料庫檔案', 'error')
@@ -101,6 +105,7 @@ def register(app):
             file.save(tmp_path)
             shutil.move(tmp_path, db_file_path)
             ensure_task_columns()
+            log_action(request.remote_addr, '還原資料庫', f'file={file.filename}')
             flash('✅ 已從備份還原資料庫！（還原前的資料已另存為 pre_restore 備份）', 'success')
         except Exception as e:
             db.session.rollback()
@@ -211,6 +216,8 @@ def register(app):
             msg = f'✅ 匯入完成！{action_label} {imported} 筆，略過重複 {skipped} 筆。'
             if error_list:
                 msg += f'（{len(error_list)} 筆錯誤）'
+            log_action(request.remote_addr, '匯入專案 CSV',
+                       f'mode={mode}, imported={imported}, skipped={skipped}')
             flash(msg, 'success')
             for err in error_list[:5]:
                 flash(err, 'error')
@@ -290,6 +297,7 @@ def register(app):
             msg = f'✅ 工作紀錄匯入完成！新增 {imported} 筆。'
             if error_list:
                 msg += f'（{len(error_list)} 筆錯誤）'
+            log_action(request.remote_addr, '匯入工時 CSV', f'imported={imported}')
             flash(msg, 'success')
             for err in error_list[:5]:
                 flash(err, 'error')
@@ -331,6 +339,8 @@ def register(app):
                     db.session.add(Representative(name=name))
                     imported += 1
             db.session.commit()
+            log_action(request.remote_addr, '匯入業務代表 CSV',
+                       f'imported={imported}, skipped={skipped}')
             flash(f'✅ 業務代表匯入完成！新增 {imported} 筆，略過重複 {skipped} 筆。', 'success')
         except Exception as e:
             db.session.rollback()
@@ -379,6 +389,8 @@ def register(app):
                     imported += 1
             db.session.commit()
             action_label = '新增/更新' if mode == 'overwrite' else '新增'
+            log_action(request.remote_addr, '匯入人員 CSV',
+                       f'mode={mode}, imported={imported}, skipped={skipped}')
             flash(f'✅ 參與人員匯入完成！{action_label} {imported} 筆，略過重複 {skipped} 筆。', 'success')
         except Exception as e:
             db.session.rollback()
@@ -418,6 +430,8 @@ def register(app):
                     db.session.add(Category(name=name))
                     imported += 1
             db.session.commit()
+            log_action(request.remote_addr, '匯入專案種類 CSV',
+                       f'imported={imported}, skipped={skipped}')
             flash(f'✅ 專案種類匯入完成！新增 {imported} 筆，略過重複 {skipped} 筆。', 'success')
         except Exception as e:
             db.session.rollback()
