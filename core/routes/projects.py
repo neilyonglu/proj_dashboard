@@ -1,4 +1,5 @@
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, date
 
 from flask import render_template, request, redirect, url_for, flash, session
 from ..extensions import db
@@ -7,6 +8,44 @@ from ..activity_log import log_action
 
 
 def register(app):
+
+    @app.route('/project/<int:id>')
+    def project_detail(id):
+        proj = Project.query.get_or_404(id)
+
+        person_map = defaultdict(lambda: {'days': 0.0, 'day_h': 0.0, 'ot_h': 0.0, 'night_h': 0.0, 'count': 0})
+        for t in proj.tasks:
+            ps = person_map[t.personnel]
+            ps['days'] += t.work_days or 0
+            ps['day_h'] += t.day_hours or 0
+            ps['ot_h'] += t.overtime_hours or 0
+            ps['night_h'] += t.night_hours or 0
+            ps['count'] += 1
+
+        person_stats = sorted(
+            [{'name': k, **v} for k, v in person_map.items()],
+            key=lambda x: x['days'], reverse=True
+        )
+
+        total_days = sum(p['days'] for p in person_stats)
+        has_hours = any(p['day_h'] > 0 or p['ot_h'] > 0 or p['night_h'] > 0 for p in person_stats)
+        today = date.today()
+        end = proj.end_date if proj.end_date else today
+        duration_days = max(0, (end - proj.start_date).days)
+        tasks_sorted = sorted(proj.tasks, key=lambda t: t.date, reverse=True)
+
+        return render_template('proj_detail.html',
+            proj=proj,
+            person_stats=person_stats,
+            person_names=[p['name'] for p in person_stats],
+            person_days=[p['days'] for p in person_stats],
+            person_day_h=[p['day_h'] for p in person_stats],
+            person_ot_h=[p['ot_h'] for p in person_stats],
+            person_night_h=[p['night_h'] for p in person_stats],
+            total_days=total_days,
+            has_hours=has_hours,
+            duration_days=duration_days,
+            tasks_sorted=tasks_sorted)
 
     @app.route('/add-project', methods=['GET', 'POST'])
     def add_proj():

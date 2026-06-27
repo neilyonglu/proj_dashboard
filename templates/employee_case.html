@@ -160,6 +160,7 @@
                             <!-- Grouping mode selector -->
                             <div class="inline-flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm text-sm font-medium">
                                 <button onclick="setGroupMode('all')" id="gbtn-all" class="group-mode-btn px-3 py-1.5 transition-colors">全部</button>
+                                <button onclick="setGroupMode('year')" id="gbtn-year" class="group-mode-btn px-3 py-1.5 border-l border-slate-200 dark:border-slate-700 transition-colors">年</button>
                                 <button onclick="setGroupMode('month')" id="gbtn-month" class="group-mode-btn px-3 py-1.5 border-l border-slate-200 dark:border-slate-700 transition-colors">月</button>
                                 <button onclick="setGroupMode('week')" id="gbtn-week" class="group-mode-btn px-3 py-1.5 border-l border-slate-200 dark:border-slate-700 transition-colors">週</button>
                                 <button onclick="setGroupMode('day')" id="gbtn-day" class="group-mode-btn px-3 py-1.5 border-l border-slate-200 dark:border-slate-700 transition-colors">日</button>
@@ -271,6 +272,7 @@
     function getGroupKey(dateStr, mode) {
         const parts = dateStr.split('-');
         const y = parts[0], m = parts[1], d = parts[2];
+        if (mode === 'year')  return y + ' 年';
         if (mode === 'month') return y + '/' + m;
         if (mode === 'day')   return y + '/' + m + '/' + d;
         if (mode === 'week') {
@@ -390,7 +392,7 @@
         currentMode = mode;
         localStorage.setItem(STORAGE_KEY, mode);
 
-        ['all', 'month', 'week', 'day'].forEach(function (m) {
+        ['all', 'year', 'month', 'week', 'day'].forEach(function (m) {
             const btn = document.getElementById('gbtn-' + m);
             if (!btn) return;
             if (m === mode) btn.classList.add('active');
