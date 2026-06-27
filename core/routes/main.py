@@ -27,14 +27,23 @@ def register(app):
         if not personnel_all:
             return render_template('employee_case.html',
                                    personnel_list=[], selected=None, display_name='',
-                                   avatar_filename=None, tasks=[], total_days=0, project_count=0)
+                                   avatar_filename=None, tasks=[], total_days=0,
+                                   project_count=0, filter_project=None)
         personnel_list = [(p.name, p.display_name or p.name) for p in personnel_all]
         selected = request.args.get('person', personnel_list[0][0])
         selected_p = Personnel.query.filter_by(name=selected).first()
         if not selected_p:
             selected_p = personnel_all[0]
             selected = selected_p.name
-        tasks = Task.query.filter_by(personnel=selected).order_by(Task.date.desc()).all()
+
+        project_id = request.args.get('project_id', type=int)
+        filter_project = None
+        if project_id:
+            tasks = Task.query.filter_by(personnel=selected, project_id=project_id).order_by(Task.date.desc()).all()
+            filter_project = Project.query.get(project_id)
+        else:
+            tasks = Task.query.filter_by(personnel=selected).order_by(Task.date.desc()).all()
+
         return render_template('employee_case.html',
                                personnel_list=personnel_list,
                                selected=selected,
@@ -43,6 +52,7 @@ def register(app):
                                tasks=tasks,
                                total_days=sum(t.work_days for t in tasks),
                                project_count=len(set(t.project_id for t in tasks)),
+                               filter_project=filter_project,
                                is_admin=bool(session.get('db_admin_auth')))
 
     @app.route('/overtime-stats')

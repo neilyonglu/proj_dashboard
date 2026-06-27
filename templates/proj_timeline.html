@@ -258,9 +258,9 @@
                                         {% if task.personnel not in task_users %}
                                         {% set _ = task_users.append(task.personnel) %}
                                         {% if task.personnel in resigned_map %}
-                                        <a href="{{ url_for('employee_case') }}?person={{ task.personnel }}" class="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs hover:bg-rose-200 transition-colors" title="已辭職 {{ resigned_map[task.personnel] }}">{{ task.personnel }} · 離職 {{ resigned_map[task.personnel] }}</a>
+                                        <a href="{{ url_for('employee_case', person=task.personnel, project_id=proj.id) }}" class="px-2 py-0.5 bg-rose-100 text-rose-700 rounded text-xs hover:bg-rose-200 transition-colors" title="已辭職 {{ resigned_map[task.personnel] }}">{{ task.personnel }} · 離職 {{ resigned_map[task.personnel] }}</a>
                                         {% else %}
-                                        <a href="{{ url_for('employee_case') }}?person={{ task.personnel }}" class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs hover:bg-blue-50 hover:text-blue-700 transition-colors">{{ task.personnel }}</a>
+                                        <a href="{{ url_for('employee_case', person=task.personnel, project_id=proj.id) }}" class="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs hover:bg-blue-50 hover:text-blue-700 transition-colors">{{ task.personnel }}</a>
                                         {% endif %}
                                         {% endif %}
                                         {% endfor %}
@@ -1296,6 +1296,16 @@
                 initColumnReordering();
                 renderTimeMarkers();
                 setupSegmentTooltip();
+
+                // Auto-apply keyword + tab from URL params (e.g. from project detail page)
+                const _urlParams = new URLSearchParams(window.location.search);
+                const urlKw = _urlParams.get('keyword');
+                if (urlKw) {
+                    const inp = document.getElementById('filter-keyword');
+                    if (inp) { inp.value = urlKw; applyDateFilter(); }
+                }
+                const urlTab = _urlParams.get('tab');
+                if (urlTab === 'timeline') { switchTab('timeline'); }
             });
         </script>
         {% endblock %}

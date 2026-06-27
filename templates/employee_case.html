@@ -91,54 +91,95 @@
                     </label>
                 </section>
 
+                <!-- Project filter banner -->
+                {% if filter_project %}
+                <div class="flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                    <div class="flex items-center gap-2 text-sm text-blue-700">
+                        <span class="material-symbols-outlined text-[16px]">filter_alt</span>
+                        篩選中：<strong>{{ filter_project.name }}</strong> 的工作紀錄
+                    </div>
+                    <a href="{{ url_for('employee_case', person=selected) }}"
+                       class="text-xs text-blue-500 hover:text-blue-700 hover:underline whitespace-nowrap flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[14px]">close</span> 查看全部紀錄
+                    </a>
+                </div>
+                {% endif %}
+
                 <!-- Employee info card -->
                 {% if selected %}
                 <section
-                    class="bg-white dark:bg-[#152330] rounded-xl border border-slate-200 dark:border-slate-800 p-8 shadow-sm">
-                    <div class="flex flex-col sm:flex-row items-center sm:items-start gap-8">
-                        {% if avatar_filename %}
-                        <img src="{{ url_for('static', filename='avatars/' + avatar_filename) }}"
-                            alt="{{ display_name }}"
-                            class="size-28 rounded-full border-4 border-white dark:border-[#152330] shadow-md object-cover bg-slate-100" />
-                        {% else %}
-                        <img src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ selected }}&backgroundColor=b6e3f4"
-                            alt="{{ display_name }}"
-                            class="size-28 rounded-full border-4 border-white dark:border-[#152330] shadow-md bg-slate-100" />
-                        {% endif %}
-                        <div class="flex flex-col justify-center text-center sm:text-left pt-2">
-                            <h1 class="text-3xl font-bold tracking-tight mb-2">{{ display_name }}</h1>
-                            <p class="text-slate-600 dark:text-slate-400 text-lg mb-1 flex items-center justify-center sm:justify-start gap-2">
-                                <span class="material-symbols-outlined text-base">work_history</span> 個人工時總表
-                            </p>
-                            <div class="flex flex-wrap gap-4 sm:gap-6 mt-3 justify-center sm:justify-start">
-                                <div class="flex items-center gap-2 text-sm">
-                                    <span class="inline-flex items-center justify-center size-8 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-                                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[18px]">schedule</span>
-                                    </span>
-                                    <div>
-                                        <div class="text-slate-400 text-xs">總工時</div>
-                                        <div class="font-bold text-slate-800 dark:text-slate-200">{{ total_days }} 天</div>
+                    class="bg-white dark:bg-[#152330] rounded-xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
+                    <div class="flex flex-col xl:flex-row items-start gap-8">
+                        <!-- Left: avatar + name + stats -->
+                        <div class="flex flex-col sm:flex-row items-center sm:items-start gap-8 flex-1">
+                            {% if avatar_filename %}
+                            <img src="{{ url_for('static', filename='avatars/' + avatar_filename) }}"
+                                alt="{{ display_name }}"
+                                class="size-28 rounded-full border-4 border-white dark:border-[#152330] shadow-md object-cover bg-slate-100" />
+                            {% else %}
+                            <img src="https://api.dicebear.com/9.x/avataaars/svg?seed={{ selected }}&backgroundColor=b6e3f4"
+                                alt="{{ display_name }}"
+                                class="size-28 rounded-full border-4 border-white dark:border-[#152330] shadow-md bg-slate-100" />
+                            {% endif %}
+                            <div class="flex flex-col justify-center text-center sm:text-left pt-2">
+                                <h1 class="text-3xl font-bold tracking-tight mb-2">{{ display_name }}</h1>
+                                <p class="text-slate-600 dark:text-slate-400 text-lg mb-1 flex items-center justify-center sm:justify-start gap-2">
+                                    <span class="material-symbols-outlined text-base">work_history</span> 個人工時總表
+                                </p>
+                                <div class="flex flex-wrap gap-4 sm:gap-6 mt-3 justify-center sm:justify-start">
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="inline-flex items-center justify-center size-8 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                                            <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 text-[18px]">schedule</span>
+                                        </span>
+                                        <div>
+                                            <div class="text-slate-400 text-xs">總工時</div>
+                                            <div class="font-bold text-slate-800 dark:text-slate-200">{{ total_days }} 天</div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center gap-2 text-sm">
-                                    <span class="inline-flex items-center justify-center size-8 rounded-lg bg-amber-50 dark:bg-amber-900/30">
-                                        <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px]">folder</span>
-                                    </span>
-                                    <div>
-                                        <div class="text-slate-400 text-xs">參與專案</div>
-                                        <div class="font-bold text-slate-800 dark:text-slate-200">{{ project_count }} 個</div>
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="inline-flex items-center justify-center size-8 rounded-lg bg-amber-50 dark:bg-amber-900/30">
+                                            <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[18px]">folder</span>
+                                        </span>
+                                        <div>
+                                            <div class="text-slate-400 text-xs">參與專案</div>
+                                            <div class="font-bold text-slate-800 dark:text-slate-200">{{ project_count }} 個</div>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="flex items-center gap-2 text-sm">
-                                    <span class="inline-flex items-center justify-center size-8 rounded-lg bg-green-50 dark:bg-green-900/30">
-                                        <span class="material-symbols-outlined text-green-600 dark:text-green-400 text-[18px]">task_alt</span>
-                                    </span>
-                                    <div>
-                                        <div class="text-slate-400 text-xs">工作紀錄</div>
-                                        <div class="font-bold text-slate-800 dark:text-slate-200">{{ tasks|length }} 筆</div>
+                                    <div class="flex items-center gap-2 text-sm">
+                                        <span class="inline-flex items-center justify-center size-8 rounded-lg bg-green-50 dark:bg-green-900/30">
+                                            <span class="material-symbols-outlined text-green-600 dark:text-green-400 text-[18px]">task_alt</span>
+                                        </span>
+                                        <div>
+                                            <div class="text-slate-400 text-xs">工作紀錄</div>
+                                            <div class="font-bold text-slate-800 dark:text-slate-200">{{ tasks|length }} 筆</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                        <!-- Right: pie chart -->
+                        <div class="w-full xl:w-auto flex flex-col gap-3 xl:min-w-[280px] border-t xl:border-t-0 xl:border-l border-slate-100 dark:border-slate-700 pt-6 xl:pt-0 xl:pl-8">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    <span class="material-symbols-outlined text-[16px] text-primary">pie_chart</span>
+                                    專案分佈
+                                    <span id="pie-period-label" class="text-xs font-normal text-slate-400 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-full ml-1">全部</span>
+                                </div>
+                                <button id="pie-reset-btn" onclick="renderEmpPieChart(null)" style="display:none"
+                                    class="text-xs text-blue-500 hover:text-blue-700 hover:underline flex items-center gap-0.5 transition-colors">
+                                    <span class="material-symbols-outlined text-[12px]">close</span> 重置
+                                </button>
+                            </div>
+                            <div class="flex items-start gap-5 flex-wrap">
+                                <div style="width:200px;height:200px;min-width:200px;flex-shrink:0;">
+                                    <canvas id="emp-pie-chart"></canvas>
+                                </div>
+                                <div id="emp-pie-legend" class="flex flex-col gap-2 text-[12px] min-w-[140px] flex-1 pt-1"></div>
+                            </div>
+                            <p class="text-[11px] text-slate-300 dark:text-slate-600 flex items-center gap-0.5">
+                                <span class="material-symbols-outlined text-[11px]">tips_and_updates</span>
+                                點分組標頭可切換期間
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -199,7 +240,8 @@
                                         data-work-days="{{ task.work_days or 0 }}"
                                         data-day-hours="{{ task.day_hours or 0 }}"
                                         data-ot-hours="{{ task.overtime_hours or 0 }}"
-                                        data-night-hours="{{ task.night_hours or 0 }}">
+                                        data-night-hours="{{ task.night_hours or 0 }}"
+                                        data-project="{{ task.project.name if task.project else 'N/A' }}">
                                         <td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400 whitespace-nowrap">
                                             {{ task.date.strftime('%Y/%m/%d') }}</td>
                                         <td class="px-6 py-4 text-sm font-medium whitespace-nowrap">
@@ -259,6 +301,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
     function switchEmployee(person) {
         window.location.href = '{{ url_for("employee_case") }}?person=' + encodeURIComponent(person);
@@ -311,7 +354,7 @@
                 '<span style="padding:1px 8px;border-radius:9999px;font-size:.7rem;font-weight:600;background:#dbeafe;color:#1d4ed8;">' + fmtN(g.workDays) + ' 天</span>' +
                 hoursHtml +
             '</div>';
-        td.addEventListener('click', function () { toggleGroup(key); });
+        td.addEventListener('click', function () { toggleGroup(key); renderEmpPieChart(key); });
         tr.appendChild(td);
         return tr;
     }
@@ -406,6 +449,124 @@
         }
 
         applyGrouping(mode);
+        renderEmpPieChart(null);
+    }
+
+    // ── Employee Pie Chart ────────────────────────────────────────────────────
+    const EMP_PIE_COLORS = [
+        '#3b82f6','#10b981','#f59e0b','#8b5cf6','#ef4444',
+        '#06b6d4','#f97316','#84cc16','#ec4899','#6366f1','#14b8a6','#fb923c'
+    ];
+    let empPieChart = null;
+
+    function empPieExternalTooltip(context) {
+        const { chart, tooltip } = context;
+        let el = document.getElementById('emp-pie-tooltip-el');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'emp-pie-tooltip-el';
+            el.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;' +
+                'background:rgba(15,23,42,0.88);color:#fff;border-radius:6px;' +
+                'padding:5px 10px;font-size:12px;white-space:nowrap;' +
+                'box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.1s;opacity:0;';
+            document.body.appendChild(el);
+        }
+        if (tooltip.opacity === 0) { el.style.opacity = '0'; return; }
+        const dp = tooltip.dataPoints[0];
+        const total = dp.dataset.data.reduce(function(a, b) { return a + b; }, 0);
+        const pct = total > 0 ? Math.round(dp.parsed / total * 100) : 0;
+        el.textContent = dp.label + ': ' + dp.parsed + ' 天 (' + pct + '%)';
+        const rect = chart.canvas.getBoundingClientRect();
+        el.style.left = (rect.left + tooltip.caretX) + 'px';
+        el.style.top = (rect.top + tooltip.caretY - 44) + 'px';
+        el.style.transform = 'translateX(-50%)';
+        el.style.opacity = '1';
+    }
+
+    function buildEmpPieData(gkey) {
+        const sel = gkey
+            ? '#task-tbody tr[data-date][data-gkey="' + gkey + '"]'
+            : '#task-tbody tr[data-date]';
+        const rows = Array.from(document.querySelectorAll(sel));
+        const totals = {};
+        rows.forEach(function(r) {
+            const proj = r.dataset.project || 'N/A';
+            totals[proj] = (totals[proj] || 0) + (parseFloat(r.dataset.workDays) || 0);
+        });
+        const sorted = Object.entries(totals).sort(function(a, b) { return b[1] - a[1]; });
+        return {
+            labels: sorted.map(function(e) { return e[0]; }),
+            data:   sorted.map(function(e) { return Math.round(e[1] * 10) / 10; })
+        };
+    }
+
+    function renderEmpPieChart(gkey) {
+        if (typeof Chart === 'undefined') return;
+
+        const pd = buildEmpPieData(gkey);
+
+        // Update period label
+        const lbl = document.getElementById('pie-period-label');
+        if (lbl) lbl.textContent = gkey || '全部';
+
+        // Show/hide reset button
+        const resetBtn = document.getElementById('pie-reset-btn');
+        if (resetBtn) resetBtn.style.display = gkey ? '' : 'none';
+
+        // Update legend
+        const legend = document.getElementById('emp-pie-legend');
+        if (legend) {
+            legend.innerHTML = pd.labels.length
+                ? pd.labels.map(function(l, i) {
+                    const c = EMP_PIE_COLORS[i % EMP_PIE_COLORS.length];
+                    const d = pd.data[i];
+                    return '<div style="display:flex;align-items:flex-start;gap:5px;">' +
+                        '<span style="width:9px;height:9px;border-radius:50%;background:' + c + ';flex-shrink:0;display:inline-block;margin-top:3px;"></span>' +
+                        '<span style="flex:1;color:#334155;word-break:break-word;line-height:1.4;">' + l + '</span>' +
+                        '<span style="color:#94a3b8;flex-shrink:0;margin-left:6px;white-space:nowrap;line-height:1.4;">' + d + '天</span>' +
+                        '</div>';
+                  }).join('')
+                : '<div style="color:#94a3b8;font-size:11px;padding-top:4px;">此期間無資料</div>';
+        }
+
+        // Update or create chart
+        const ctx = document.getElementById('emp-pie-chart');
+        if (!ctx) return;
+        const bgColors = pd.labels.map(function(_, i) { return EMP_PIE_COLORS[i % EMP_PIE_COLORS.length]; });
+
+        if (empPieChart) {
+            empPieChart.data.labels = pd.labels;
+            empPieChart.data.datasets[0].data = pd.data;
+            empPieChart.data.datasets[0].backgroundColor = bgColors;
+            empPieChart.update('none');
+        } else {
+            empPieChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: pd.labels,
+                    datasets: [{
+                        data: pd.data,
+                        backgroundColor: bgColors,
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    animation: { duration: 250 },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: false,
+                            external: empPieExternalTooltip
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
     }
 
     // Initialize on load

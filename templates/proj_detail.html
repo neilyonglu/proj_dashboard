@@ -19,10 +19,16 @@
                 <h2 class="text-slate-900 text-lg font-bold leading-tight">{{ proj.name }}</h2>
             </div>
         </div>
-        <a href="{{ url_for('edit_project', id=proj.id) }}"
-           class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition-colors">
-            <span class="material-symbols-outlined text-[16px]">edit</span> 編輯
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{{ url_for('proj_timeline', keyword=proj.name, tab='timeline') }}"
+               class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-primary hover:bg-slate-50 border border-slate-200 transition-colors">
+                <span class="material-symbols-outlined text-[16px]">timeline</span> 時間軸
+            </a>
+            <a href="{{ url_for('edit_project', id=proj.id) }}"
+               class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 border border-slate-200 transition-colors">
+                <span class="material-symbols-outlined text-[16px]">edit</span> 編輯
+            </a>
+        </div>
     </div>
 
     <div class="flex-1 overflow-auto p-6">
@@ -161,7 +167,7 @@
                             <div class="flex items-center gap-2 min-w-0">
                                 <span class="inline-block size-3 rounded-full shrink-0"
                                       style="background:{{ PIE_COLORS[loop.index0 % PIE_COLORS|length] }}"></span>
-                                <a href="{{ url_for('employee_case') }}?person={{ p.name }}"
+                                <a href="{{ url_for('employee_case', person=p.name, project_id=proj.id) }}"
                                    class="text-slate-700 hover:text-primary hover:underline truncate text-[13px]">{{ p.name }}</a>
                                 <span class="text-slate-400 ml-auto shrink-0 text-[13px]">{{ '%g'|format(p.days) }} 天</span>
                             </div>
@@ -212,7 +218,7 @@
                                     {{ task.date.strftime('%Y/%m/%d') }}
                                 </td>
                                 <td class="px-5 py-3 whitespace-nowrap">
-                                    <a href="{{ url_for('employee_case') }}?person={{ task.personnel }}"
+                                    <a href="{{ url_for('employee_case', person=task.personnel, project_id=proj.id) }}"
                                        class="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
                                         {{ task.personnel }}
                                     </a>
