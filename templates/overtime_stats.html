@@ -7,14 +7,12 @@
     <!-- Header -->
     <div class="flex items-center justify-between px-6 py-3 border-b border-slate-200 bg-white shrink-0">
         <div class="flex items-center gap-3">
-            <a href="{{ url_for('index') }}" class="flex items-center gap-1 text-slate-500 hover:text-primary transition-colors hover:underline" title="返回首頁">
-                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
-                <span class="text-sm font-medium">首頁</span>
+            <a href="{{ url_for('index') }}" class="flex items-center gap-2 text-slate-500 hover:text-primary transition-colors" title="返回首頁">
+                <span class="material-symbols-outlined text-[20px]">arrow_back</span>
             </a>
-            <span class="text-slate-300 select-none">|</span>
             <div class="flex items-center gap-2">
                 <span class="material-symbols-outlined text-[22px] text-primary">more_time</span>
-                <h2 class="text-slate-900 text-lg font-bold leading-tight">加班統計</h2>
+                <a href="{{ url_for('index') }}" class="text-slate-900 text-lg font-bold leading-tight hover:text-primary hover:underline transition-colors">加班統計</a>
             </div>
         </div>
     </div>
