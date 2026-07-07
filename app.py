@@ -45,7 +45,9 @@ app.config['DB_ADMIN_PASSWORD'] = os.environ.get('DB_ADMIN_PASSWORD', 'admin123'
 from core.extensions import db
 db.init_app(app)
 
-APP_VERSION = '1.2.1'
+APP_VERSION = '1.3.0'
+app.config['APP_VERSION'] = APP_VERSION
+app.config['APPLICATION_PATH'] = application_path
 
 @app.context_processor
 def inject_app_version():
@@ -57,7 +59,7 @@ register_routes(app)
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    from core.helpers import backup_database, ensure_task_columns, ensure_personnel_columns
+    from core.helpers import backup_database, ensure_task_columns, ensure_personnel_columns, start_daily_backup_scheduler
     from core.models import Representative, Category, Personnel, Task
 
     with app.app_context():
@@ -91,6 +93,8 @@ if __name__ == '__main__':
                 if not Personnel.query.filter_by(name=name).first():
                     db.session.add(Personnel(name=name, display_name=name))
             db.session.commit()
+
+    start_daily_backup_scheduler(app)
 
     print("系統已啟動，請開啟瀏覽器輸入 http://localhost:5001")
     from waitress import serve

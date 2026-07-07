@@ -1,5 +1,7 @@
 import os
 import shutil
+import threading
+import time
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -101,3 +103,16 @@ def backup_database(reason='auto', once_per_day=False):
     except Exception as e:
         print(f'清理舊備份失敗：{e}')
     return dest
+
+
+def start_daily_backup_scheduler(app, check_interval_seconds=3600):
+    """Background thread: re-check once per hour so a long-running server
+    (never restarted) still gets a daily backup, not just one at startup."""
+    def loop():
+        while True:
+            time.sleep(check_interval_seconds)
+            with app.app_context():
+                backup_database(reason='daily', once_per_day=True)
+    thread = threading.Thread(target=loop, daemon=True)
+    thread.start()
+    return thread

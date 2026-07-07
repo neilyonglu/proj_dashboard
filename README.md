@@ -1,6 +1,6 @@
 # 專案管理與工時追蹤系統 (Project Dashboard)
 
-> **版本：v1.2.1**
+> **版本：v1.3.0**
 
 一個基於 Python Flask 開發的輕量級企業內部專案與人員工時管理系統。提供直覺的介面來管理專案進度、人員工作紀錄、並具備甘特圖式的時間軸檢視以及完整的資料庫匯入/匯出功能。
 
@@ -106,8 +106,19 @@ proj_dashboard/
    - **Windows CMD / PowerShell**: 執行 `build.bat`
    - **Git Bash / Linux / macOS**: 執行 `./build.sh`
 3. **完成打包**：
-   打包完成後，會在專案根目錄產生 `proj_dash.exe`。
+   打包完成後，會在專案根目錄產生 `proj_dash.exe`，以及 `proj_dash_update.zip`（`proj_dash.exe` + `templates/` + `static/` 打包在一起，供下方「發布新版本」上傳使用）。
    *(註：打包出的 exe 檔案會自動讀取同層目錄下的 `templates` 與 `static` 資料夾，因此在部屬 exe 給其他人使用時，請將 `proj_dash.exe` 與這兩個資料夾放在同一個目錄下。)*
+
+## 🚀 發布新版本（供一鍵更新使用）
+
+程式內建的「檢查更新／一鍵更新」會讀取本專案 GitHub Release 的 `proj_dash_update.zip` 附件。發布新版時：
+
+1. 更新 `app.py` 裡的 `APP_VERSION`（例如 `1.3.1`），並在 README 補上 changelog。
+2. 執行 `build.bat` 產生 `proj_dash.exe` 與 `proj_dash_update.zip`。
+3. 到 GitHub 建立新的 tag/release（例如 `v1.3.1`），把 `proj_dash_update.zip` 當作附件上傳。
+4. 已在跑舊版 exe 的電腦，下次點擊「檢查更新」就會看到新版本，管理者登入後即可「立即更新」。
+
+*(若某次發布沒有上傳 `proj_dash_update.zip`，舊版程式只會顯示「已是最新版本」，不會出錯，但也不會提示這個新 release。)*
 
 ## 💡 使用說明
 
@@ -122,6 +133,10 @@ proj_dashboard/
 5. **操作日誌**：所有操作記錄在 `instance/logs/activity_YYYYMM_NNN.log`，可用文字編輯器直接開啟查閱。
 
 ## 📋 版本紀錄 (Changelog)
+
+### v1.3.0
+- **資料庫每日備份修正**：改為啟動時＋背景每小時檢查一次，伺服器長時間不重啟也能確保每天備份一次（原本只在啟動當下判斷，長期不重啟就不會再備份）
+- **一鍵自動更新**：首頁與資料庫管理後台可偵測 GitHub 上的新版本，管理者登入後可一鍵下載、自動關閉並重啟為新版（詳見下方「發布新版本」說明）
 
 ### v1.2.1
 - **員工表專案圓餅圖**：員工資訊卡右側新增「專案分佈」甜甜圈圖，顯示各專案工時佔比；點擊下方分組標頭（年／月／週／日）可即時切換該期間的圓餅圖，tooltip 改為 HTML 浮層不受 canvas 邊界遮擋
