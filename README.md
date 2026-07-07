@@ -20,7 +20,7 @@
     *   支援全資料表（專案、工作紀錄、人員、業務代表、專案種類）的**搜尋與管理**。
     *   **新增、編輯與刪除**專案種類與業務代表（改名時會自動同步更新關聯專案）；修改人員系統代號時會同步更新所有相關工作紀錄。
     *   **CSV 匯出/匯入**：支援一鍵備份資料為 CSV，並支援上傳 CSV 進行批量新增或覆蓋更新（自動處理 Excel 產生的 BIG5 編碼與 UTF-8-BOM 問題）。
-    *   **資料庫備份/還原**：每次啟動自動備份資料庫（保留最近 10 份），並可在後台一鍵「立即備份」、「下載備份」與「還原備份」（還原前會自動先備份目前資料）。
+    *   **資料庫備份/還原**：每天自動備份資料庫一次（啟動時檢查＋伺服器持續運作時每小時檢查一次，保留最近 10 份），並可在後台一鍵「立即備份」、「下載備份」與「還原備份」（還原前會自動先備份目前資料）。
 *   **📋 操作日誌 (Activity Log)**：所有寫入操作（新增／編輯／刪除／匯入／備份、登入成功與失敗）皆自動記錄至 `instance/logs/` 目錄，格式為 `[時間] IP | 操作 | 細節`，每個月份自動分檔（每檔上限 2000 筆）。
 
 ## 🛠️ 技術棧 (Tech Stack)
@@ -38,16 +38,16 @@ proj_dashboard/
 ├── core/                  # 核心應用模組
 │   ├── extensions.py      # SQLAlchemy db 實例
 │   ├── models.py          # 資料庫模型（Project, Task, Personnel, ...）
-│   ├── helpers.py         # 工具函式（備份、Migration、表單解析）
+│   ├── helpers.py         # 工具函式（備份＋每日排程、Migration、表單解析）
+│   ├── updater.py         # 版本檢查與一鍵自我更新（下載/替換/重啟）
 │   ├── activity_log.py    # 操作日誌寫入模組
 │   └── routes/            # 路由模組
 │       ├── main.py        # 儀表板、時間軸、員工頁、加班統計
 │       ├── projects.py    # 專案 CRUD
 │       ├── tasks.py       # 工時紀錄 CRUD
-│       ├── admin.py       # 後台登入、備份 API、CSV 匯出/匯入
+│       ├── admin.py       # 後台登入、備份 API、自我更新 API、CSV 匯出/匯入
 │       └── manage.py      # 人員、代表、分類管理
-├── build.bat              # Windows 打包執行檔腳本 (PyInstaller)
-├── build.sh               # Bash 打包執行檔腳本 (PyInstaller)
+├── build.bat              # Windows 打包執行檔腳本 (PyInstaller)，同時產生 proj_dash_update.zip
 ├── .env                   # 環境變數設定檔 (需手動建立, 已被 .gitignore 排除)
 ├── instance/              # 執行期資料 (已被 .gitignore 排除)
 │   ├── app.db             # SQLite 資料庫檔案 (系統自動建立)
@@ -102,9 +102,10 @@ proj_dashboard/
    ```bash
    pip install pyinstaller
    ```
-2. **執行打包腳本**：
-   - **Windows CMD / PowerShell**: 執行 `build.bat`
-   - **Git Bash / Linux / macOS**: 執行 `./build.sh`
+2. **執行打包腳本**（僅支援 Windows）：
+   ```powershell
+   cmd.exe /c build.bat
+   ```
 3. **完成打包**：
    打包完成後，會在專案根目錄產生 `proj_dash.exe`，以及 `proj_dash_update.zip`（`proj_dash.exe` + `templates/` + `static/` 打包在一起，供下方「發布新版本」上傳使用）。
    *(註：打包出的 exe 檔案會自動讀取同層目錄下的 `templates` 與 `static` 資料夾，因此在部屬 exe 給其他人使用時，請將 `proj_dash.exe` 與這兩個資料夾放在同一個目錄下。)*
@@ -128,7 +129,7 @@ proj_dashboard/
    *   下載 CSV 備份或匯入修改後的 CSV 進行資料還原或批量更新。
    *   使用「立即備份 / 下載備份 / 還原備份」管理整個資料庫檔案（`.db`）。
 4. **資料庫備份與還原**：
-   *   每次啟動會自動在 `instance/backups/` 建立備份，最多保留最近 10 份。
+   *   每天自動在 `instance/backups/` 建立一次備份（啟動時檢查一次，之後即使伺服器不重啟也會每小時再檢查一次），最多保留最近 10 份。
    *   要還原時，點「還原備份」並上傳先前下載的 `.db` 檔；系統會在覆蓋前自動先備份目前資料（`pre_restore`），確保可回復。
 5. **操作日誌**：所有操作記錄在 `instance/logs/activity_YYYYMM_NNN.log`，可用文字編輯器直接開啟查閱。
 

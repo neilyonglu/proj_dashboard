@@ -45,7 +45,7 @@ Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue
 One command, all key pages. Extend the list when you add pages; keep it ONE command.
 
 ```powershell
-$pages = @("/", "/timeline", "/employee-case", "/overtime-stats", "/add-project", "/add-task"); foreach ($p in $pages) { try { $r = Invoke-WebRequest -Uri "http://localhost:5001$p" -UseBasicParsing -TimeoutSec 5; Write-Output "$p -> $($r.StatusCode)" } catch { Write-Output "$p -> FAIL $($_.Exception.Message)" } }
+$pages = @("/", "/timeline", "/employee-case", "/overtime-stats", "/add-project", "/add-task", "/api/check-update"); foreach ($p in $pages) { try { $r = Invoke-WebRequest -Uri "http://localhost:5001$p" -UseBasicParsing -TimeoutSec 5; Write-Output "$p -> $($r.StatusCode)" } catch { Write-Output "$p -> FAIL $($_.Exception.Message)" } }
 ```
 
 To verify a specific template change actually rendered, grep the page for a marker
@@ -59,8 +59,11 @@ A template edit is NOT verified until a real GET shows the marker.
 
 ## Syntax check without starting the app
 
+`conda run` intermittently fails with "conda not recognized" in this shell — use
+the env's python directly (verified working 2026-07-07):
+
 ```powershell
-conda run -n proj_dash python -c "import ast; ast.parse(open('app.py',encoding='utf-8').read()); print('app.py syntax OK')"
+& "C:\Users\Neil\miniconda3\envs\proj_dash\python.exe" -c "import ast; ast.parse(open('app.py',encoding='utf-8').read()); print('app.py syntax OK')"
 ```
 
 ## Run a one-off script against the project / DB
@@ -82,6 +85,8 @@ cmd.exe /c build.bat
 
 `build.bat` already calls conda internally (commit a16a578) and deletes the .spec.
 Output `proj_dash.exe` must sit next to `templates\` and `static\` to run.
+It also produces `proj_dash_update.zip` (exe + templates + static) — upload this
+as the GitHub Release asset so the in-app "一鍵更新" can find it (README "發布新版本").
 
 ## Known traps (Windows / this project)
 
