@@ -28,6 +28,11 @@
                 title="下載目前資料庫檔案">
                 <span class="material-symbols-outlined text-[15px]">download</span>下載備份
             </a>
+            <a href="{{ url_for('export_all') }}"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
+                title="匯出整個資料庫為一個 Excel 檔（每張表一個分頁）">
+                <span class="material-symbols-outlined text-[15px]">table_view</span>全部匯出 (Excel)
+            </a>
             <form action="{{ url_for('backup_restore') }}" method="POST" enctype="multipart/form-data" class="inline"
                 id="restore-form">
                 <input type="file" name="db_file" accept=".db" class="hidden" id="restore-file-input"
@@ -43,6 +48,11 @@
                 title="檢查是否有新版本">
                 <span class="material-symbols-outlined text-[15px]">system_update</span>檢查更新
             </button>
+            <a href="https://github.com/neilyonglu/proj_dashboard/releases/latest" target="_blank" rel="noopener"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
+                title="下載 proj_dash_installer.exe，雙擊即可手動安裝更新（不會動到資料庫）">
+                <span class="material-symbols-outlined text-[15px]">install_desktop</span>手動安裝更新
+            </a>
         </div>
     </div>
 

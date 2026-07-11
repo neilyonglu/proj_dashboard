@@ -83,6 +83,32 @@ Before any schema experiment, copy `instance\app.db` aside first.
 cmd.exe /c build.bat
 ```
 
+If invoked as `cmd.exe /c "cd /d <path> && build.bat"` from the PowerShell tool,
+it can fail with `'build.bat' is not recognized` even though the file exists and
+`cd /d <path> && dir build.bat` succeeds (verified 2026-07-11). Use the absolute
+path instead, after `Set-Location` to the project root:
+
+```powershell
+& cmd.exe /c "C:\Users\Neil\project\dad_projects\proj_dashboard\build.bat"
+```
+
+`build.bat` calls `python.exe -m PyInstaller` directly (not `conda run`, which was
+observed to silently drop the rest of the script after a long build) but manually
+prepends the env's `Library\bin` etc. to PATH first — without that, PyInstaller
+can't find `libffi` and the built exe crashes instantly with `ImportError: DLL
+load failed while importing _ctypes` (no window, no console output unless you
+redirect stdout yourself; verified 2026-07-11). After any change to `build.bat`'s
+PyInstaller invocation, verify the exe isn't just "file exists" but actually
+boots — run it and hit a real page, since a broken build silently produces a
+same-shaped exe that just crashes on start:
+
+```powershell
+cmd.exe /c "cd /d C:\Users\Neil\project\dad_projects\proj_dashboard && start /B proj_dash.exe > exe_test.log 2>&1"
+Start-Sleep -Seconds 6
+Get-Content "C:\Users\Neil\project\dad_projects\proj_dashboard\exe_test.log"
+Invoke-WebRequest -Uri "http://localhost:5001/" -UseBasicParsing
+```
+
 `build.bat` already calls conda internally (commit a16a578) and deletes the .spec.
 Output `proj_dash.exe` must sit next to `templates\` and `static\` to run.
 It also produces `proj_dash_update.zip` (exe + templates + static) — upload this

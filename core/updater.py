@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -62,10 +63,45 @@ def check_for_update(current_version, force=False):
     return result
 
 
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(65536), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _changed_files(src_dir, dst_dir):
+    """Relative paths (os.sep-joined) under src_dir whose content differs from
+    the corresponding file under dst_dir, or that don't exist there yet."""
+    changed = []
+    for root, _dirs, files in os.walk(src_dir):
+        for name in files:
+            src_path = os.path.join(root, name)
+            rel = os.path.relpath(src_path, src_dir)
+            dst_path = os.path.join(dst_dir, rel)
+            if not os.path.exists(dst_path) or _sha256(src_path) != _sha256(dst_path):
+                changed.append(rel)
+    return changed
+
+
+def _bat_copy_lines(changed, src_dir, dst_dir):
+    lines = []
+    for rel in changed:
+        src = os.path.join(src_dir, rel)
+        dst = os.path.join(dst_dir, rel)
+        dst_folder = os.path.dirname(dst)
+        lines.append(f'if not exist "{dst_folder}" mkdir "{dst_folder}" >nul 2>&1')
+        lines.append(f'copy /Y "{src}" "{dst}" >nul')
+    return '\n'.join(lines)
+
+
 def perform_self_update(download_url, application_path):
-    """Download the release zip (exe + templates/ + static/), then spawn a
-    detached relauncher .bat that waits for this process to exit, swaps the
-    files, and restarts the exe. Only valid inside a PyInstaller build."""
+    """Download the release zip (exe + templates/ + static/), hash-compare each
+    file against what's installed, then spawn a detached relauncher .bat that
+    waits for this process to exit and only overwrites the files that actually
+    changed (never touches instance/app.db or instance/backups — the zip never
+    contains them). Only valid inside a PyInstaller build."""
     if not getattr(sys, 'frozen', False):
         raise RuntimeError('自我更新僅支援封裝後的 exe，開發模式請直接 git pull。')
 
@@ -84,19 +120,21 @@ def perform_self_update(download_url, application_path):
     current_exe = sys.executable
     tpl_src = os.path.join(extract_dir, 'templates')
     static_src = os.path.join(extract_dir, 'static')
+    tpl_dst = os.path.join(application_path, 'templates')
+    static_dst = os.path.join(application_path, 'static')
 
-    bat_path = os.path.join(stage_dir, 'apply_update.bat')
-    with open(bat_path, 'w') as f:
-        f.write(f'''@echo off
-setlocal
-set "EXE={current_exe}"
-set "NEWEXE={new_exe}"
-set "TPL_SRC={tpl_src}"
-set "STATIC_SRC={static_src}"
-set "APP_DIR={application_path}"
-set "STAGE={stage_dir}"
+    exe_changed = not os.path.exists(current_exe) or _sha256(new_exe) != _sha256(current_exe)
+    changed_templates = _changed_files(tpl_src, tpl_dst) if os.path.exists(tpl_src) else []
+    changed_static = _changed_files(static_src, static_dst) if os.path.exists(static_src) else []
+    copy_block = '\n'.join(filter(None, [
+        _bat_copy_lines(changed_templates, tpl_src, tpl_dst),
+        _bat_copy_lines(changed_static, static_src, static_dst),
+    ]))
+
+    exe_swap_block = ''
+    if exe_changed:
+        exe_swap_block = '''
 set "TRIES=0"
-
 :retry
 set /a TRIES+=1
 if exist "%EXE%.bak" del /Q "%EXE%.bak" >nul 2>&1
@@ -106,17 +144,26 @@ if errorlevel 1 (
     timeout /t 1 /nobreak >nul
     goto retry
 )
-
 move /Y "%NEWEXE%" "%EXE%" >nul
-if exist "%TPL_SRC%" xcopy /Y /E /I /Q "%TPL_SRC%" "%APP_DIR%\\templates\\" >nul
-if exist "%STATIC_SRC%" xcopy /Y /E /I /Q "%STATIC_SRC%" "%APP_DIR%\\static\\" >nul
-start "" "%EXE%"
-goto cleanup
-
+goto after_exe
 :giveup
+goto after_exe
+:after_exe
+'''
+    else:
+        exe_swap_block = 'timeout /t 1 /nobreak >nul\n'
+
+    bat_path = os.path.join(stage_dir, 'apply_update.bat')
+    with open(bat_path, 'w') as f:
+        f.write(f'''@echo off
+setlocal
+set "EXE={current_exe}"
+set "NEWEXE={new_exe}"
+set "STAGE={stage_dir}"
+{exe_swap_block}
+{copy_block}
 start "" "%EXE%"
 
-:cleanup
 rmdir /S /Q "%STAGE%" >nul 2>&1
 (goto) 2>nul & del "%~f0"
 ''')

@@ -2,8 +2,7 @@
 
 Extracted from the old CLAUDE.md on 2026-07-06. This is a convenience map — the code
 is the source of truth. If this file disagrees with the code, fix this file
-(see global `40-maintenance.md`). For "where/how does X work" questions, prefer the
-codegraph MCP (`codegraph_explore`) over reading this file plus grepping.
+(see global `40-maintenance.md`).
 
 ## Directory layout
 
@@ -71,6 +70,7 @@ Admin, session-gated (`admin.py`, `manage.py`):
 | `/api/export-reps`, `/api/import-reps` | representatives CSV |
 | `/api/export-personnel`, `/api/import-personnel` | personnel CSV |
 | `/api/export-categories`, `/api/import-categories` | categories CSV |
+| `GET /api/export-all` | whole DB as one .xlsx, one sheet per table (admin-auth gated) |
 | `GET /api/backup-download`; `POST /api/backup-now`, `/api/backup-restore` | DB backup |
 | `GET /api/check-update`; `POST /api/update-now` | self-update (latter admin-auth gated) |
 
@@ -105,9 +105,21 @@ Admin, session-gated (`admin.py`, `manage.py`):
   gated) downloads that release's `proj_dash_update.zip` asset (built by
   `build.bat`: exe + `templates/` + `static/`, since PyInstaller does NOT embed
   those folders — most past releases changed templates, not just Python code),
-  writes a detached relauncher `.bat` that waits for the running exe to unlock,
-  swaps exe/templates/static (keeping one `.bak` of the old exe), and restarts
-  it, then the Flask process exits itself. Only works inside a frozen
-  PyInstaller build (`sys.frozen`); no-ops with a clear error in dev. Requires
-  Neil to manually attach `proj_dash_update.zip` to each GitHub Release — see
-  README "發布新版本".
+  hash-compares (`_sha256`/`_changed_files`) each extracted file against what's
+  installed and only writes the ones that actually differ, writes a detached
+  relauncher `.bat` that waits for the running exe to unlock, swaps only the
+  changed exe/templates/static files (keeping one `.bak` of the old exe if the
+  exe changed), and restarts it, then the Flask process exits itself. Only
+  works inside a frozen PyInstaller build (`sys.frozen`); no-ops with a clear
+  error in dev. Requires Neil to manually attach `proj_dash_update.zip` to
+  each GitHub Release — see README "發布新版本".
+- Manual update installer (`tools/installer.py`, built by `build.bat` into a
+  separate `proj_dash_installer.exe`): pure-stdlib standalone script — reuses
+  `core.updater`'s `_sha256`/`_changed_files`/`API_LATEST_RELEASE`/`ASSET_NAME`
+  but does NOT import Flask/db, so it can be PyInstalled independently of the
+  main app. Meant to be downloaded and double-clicked directly from a GitHub
+  Release, without going through the running app's admin UI (e.g. if the exe
+  won't start). Stops `proj_dash.exe` via `taskkill` if running, applies the
+  same changed-files-only swap, never touches `instance/app.db` or
+  `instance/backups` (the release zip never contains them), then relaunches
+  the app if it was running.

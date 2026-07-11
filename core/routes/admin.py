@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 
 from flask import render_template, request, redirect, url_for, flash, session, send_file, Response, jsonify
+from openpyxl import Workbook
 from ..extensions import db
 from ..models import Project, Task, Personnel, Representative, Category
 from ..helpers import backup_database, ensure_task_columns, BACKUP_KEEP
@@ -157,6 +158,54 @@ def register(app):
     def _read_csv(file):
         content = file.read().decode('utf-8-sig')
         return csv.DictReader(io.StringIO(content))
+
+    # ── Full DB export (single .xlsx, one sheet per table) ──────────────────────
+
+    @app.route('/api/export-all')
+    def export_all():
+        guard = _require_auth()
+        if guard:
+            return guard
+
+        projects = Project.query.order_by(Project.start_date.desc()).all()
+        tasks = Task.query.order_by(Task.id).all()
+        reps = Representative.query.order_by(Representative.name).all()
+        personnel = Personnel.query.order_by(Personnel.name).all()
+        categories = Category.query.order_by(Category.name).all()
+
+        wb = Workbook()
+        wb.remove(wb.active)
+
+        def _sheet(title, headers, rows):
+            ws = wb.create_sheet(title)
+            ws.append(headers)
+            for row in rows:
+                ws.append(row)
+
+        _sheet('專案', ['專案名稱', '狀態', '業務代表', '設備', '專案種類', '內容敘述', '起始日', '結束日', '參與人員', '備註'],
+               [[p.name, p.status, p.rep, p.equipment, p.category, p.description,
+                 p.start_date.strftime('%Y/%m/%d') if p.start_date else '',
+                 p.end_date.strftime('%Y/%m/%d') if p.end_date else '',
+                 ', '.join(set(t.personnel for t in p.tasks)), p.notes] for p in projects])
+
+        _sheet('工作紀錄', ['所屬專案', '人員', '日期', '工作天數', '日班時數', '加班時數', '夜班時數', '工作描述', '備註'],
+               [[t.project.name if t.project else '', t.personnel,
+                 t.date.strftime('%Y/%m/%d') if t.date else '', t.work_days,
+                 t.day_hours if t.day_hours is not None else '',
+                 t.overtime_hours if t.overtime_hours is not None else '',
+                 t.night_hours if t.night_hours is not None else '',
+                 t.description, t.notes or ''] for t in tasks])
+
+        _sheet('業務代表', ['名稱'], [[r.name] for r in reps])
+        _sheet('參與人員', ['系統代號', '顯示名稱'], [[p.name, p.display_name or ''] for p in personnel])
+        _sheet('專案種類', ['種類名稱'], [[c.name] for c in categories])
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        filename = f"proj_dashboard_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return send_file(buf, as_attachment=True, download_name=filename,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
     # ── Projects CSV ──────────────────────────────────────────────────────────
 

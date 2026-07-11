@@ -115,9 +115,9 @@ proj_dashboard/
 程式內建的「檢查更新／一鍵更新」會讀取本專案 GitHub Release 的 `proj_dash_update.zip` 附件。發布新版時：
 
 1. 更新 `app.py` 裡的 `APP_VERSION`（例如 `1.3.1`），並在 README 補上 changelog。
-2. 執行 `build.bat` 產生 `proj_dash.exe` 與 `proj_dash_update.zip`。
-3. 到 GitHub 建立新的 tag/release（例如 `v1.3.1`），把 `proj_dash_update.zip` 當作附件上傳。
-4. 已在跑舊版 exe 的電腦，下次點擊「檢查更新」就會看到新版本，管理者登入後即可「立即更新」。
+2. 執行 `build.bat` 產生 `proj_dash.exe`、`proj_dash_update.zip`，以及獨立手動安裝程式 `proj_dash_installer.exe`。
+3. 到 GitHub 建立新的 tag/release（例如 `v1.3.1`），把 `proj_dash_update.zip`（一鍵更新用）與 `proj_dash_installer.exe`（手動安裝用，雙擊即可）都當作附件上傳。
+4. 已在跑舊版 exe 的電腦，下次點擊「檢查更新」就會看到新版本，管理者登入後即可「立即更新」；或直接下載 `proj_dash_installer.exe` 雙擊手動安裝。兩種方式都只覆寫真的有變動的檔案，且不會動到 `instance/app.db` 與 `instance/backups`。
 
 *(若某次發布沒有上傳 `proj_dash_update.zip`，舊版程式只會顯示「已是最新版本」，不會出錯，但也不會提示這個新 release。)*
 
@@ -134,6 +134,11 @@ proj_dashboard/
 5. **操作日誌**：所有操作記錄在 `instance/logs/activity_YYYYMM_NNN.log`，可用文字編輯器直接開啟查閱。
 
 ## 📋 版本紀錄 (Changelog)
+
+### v1.3.1
+- **全庫匯出 (Excel)**：資料庫管理頁新增「全部匯出 (Excel)」，一次匯出整個資料庫成單一 .xlsx 檔，每個資料表各一個分頁
+- **手動安裝更新程式**：新增獨立的 `proj_dash_installer.exe`，雙擊即可連線 GitHub 抓取最新版本並安裝，不需要透過網頁介面，`instance/app.db` 與 `instance/backups` 不會被更動
+- **自動更新改為只覆寫有變動的檔案**：套用更新前逐檔比對雜湊值，未變動的檔案不再重新寫入，降低重啟風險
 
 ### v1.3.0
 - **資料庫每日備份修正**：改為啟動時＋背景每小時檢查一次，伺服器長時間不重啟也能確保每天備份一次（原本只在啟動當下判斷，長期不重啟就不會再備份）
