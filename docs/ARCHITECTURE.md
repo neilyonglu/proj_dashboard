@@ -88,6 +88,16 @@ Admin, session-gated (`admin.py`, `manage.py`):
   `templates/proj_timeline.html` (~line 402), NOT in `static/js/main.js` (that file
   is combobox code). `new Date('YYYY-MM-DD')` is treated as UTC and shifts months
   (April bled into May).
+- `Project.status` holds a comma-joined string of one or more of 進行中/等待中/
+  暫緩中/已結案 (multi-select checkboxes in add/edit forms, since v1.3.2) — never
+  compare it with `==`; always `.split(',')` first or use `.contains()` for a
+  single-value match (`core/routes/main.py`'s active-project count and
+  `STATUS_COLORS` lookup already do this — the latter keys off only the first
+  token, `primary_status`, since the timeline bar only has room for one tag).
+- `Personnel.resigned_date` (nullable `Date`) marks former employees; `NULL` =
+  active. `/employee-case`'s personnel dropdown filters to active only
+  (`core/routes/main.py`), but a resigned person is still reachable by direct
+  link (e.g. from the timeline's 離職 badge) since that lookup isn't filtered.
 - CSV import auto-detects UTF-8 / UTF-8-BOM / BIG5 (Excel compatibility); import
   modes are `skip` (skip duplicates) or `overwrite`.
 - Avatar upload: PNG/JPG/GIF/WebP only, max 5 MB.

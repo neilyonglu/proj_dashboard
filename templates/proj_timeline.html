@@ -232,22 +232,27 @@
                                     {% if proj.end_date %} - {{ proj.end_date.strftime('%Y/%m/%d') }}{% endif %}
                                 </td>
                                 <td class="px-4 py-3" data-col-id="col-status">
-                                    {% if proj.status == '進行中' %}
-                                    <span
-                                        class="px-2 py-1 bg-amber-100 text-amber-800 rounded font-medium text-xs">進行中</span>
-                                    {% elif proj.status == '暫緩中' %}
-                                    <span
-                                        class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium text-xs">暫緩中</span>
-                                    {% elif proj.status == '等待中' %}
-                                    <span
-                                        class="px-2 py-1 bg-pink-100 text-pink-800 rounded font-medium text-xs">等待中</span>
-                                    {% elif proj.status == '已結案' %}
-                                    <span
-                                        class="px-2 py-1 bg-green-100 text-green-800 rounded font-medium text-xs">已結案</span>
-                                    {% else %}
-                                    <span class="px-2 py-1 bg-slate-100 text-slate-800 rounded font-medium text-xs">{{
-                                        proj.status }}</span>
-                                    {% endif %}
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for s in proj.status.split(',') %}
+                                        {% if s == '進行中' %}
+                                        <span
+                                            class="px-2 py-1 bg-amber-100 text-amber-800 rounded font-medium text-xs">進行中</span>
+                                        {% elif s == '暫緩中' %}
+                                        <span
+                                            class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium text-xs">暫緩中</span>
+                                        {% elif s == '等待中' %}
+                                        <span
+                                            class="px-2 py-1 bg-pink-100 text-pink-800 rounded font-medium text-xs">等待中</span>
+                                        {% elif s == '已結案' %}
+                                        <span
+                                            class="px-2 py-1 bg-green-100 text-green-800 rounded font-medium text-xs">已結案</span>
+                                        {% else %}
+                                        <span
+                                            class="px-2 py-1 bg-slate-100 text-slate-800 rounded font-medium text-xs">{{
+                                            s }}</span>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3" data-col-id="col-rep">{{ proj.rep }}</td>
                                 <td class="px-4 py-3" data-col-id="col-equip">{{ proj.equipment if proj.equipment else '' }}</td>
@@ -327,7 +332,7 @@
                                     <span class="text-[13px] font-semibold text-slate-700">{{ item.proj.name }}</span>
                                     <span
                                         class="{{ item.tag_class }} text-white text-[11px] px-1.5 py-0.5 rounded font-medium">{{
-                                        item.proj.status }}</span>
+                                        item.primary_status }}</span>
                                     <span class="text-slate-500 text-[12px]">{{ item.proj.rep }}</span>
                                     <span class="text-slate-400 text-[12px]">{{ item.proj.description if item.proj.description else '' }}</span>
                                 </div>
@@ -984,7 +989,7 @@
                 });
 
                 if (repColIdx > -1) addFilterSelect(repColIdx, 'filter-rep');
-                if (statusColIdx > -1) addFilterSelect(statusColIdx, 'filter-status');
+                if (statusColIdx > -1) addStatusMultiFilter(statusColIdx);
                 
                 if (personnelColIdx > -1) {
                     const th = headers[personnelColIdx];
@@ -1019,6 +1024,59 @@
                     th.innerHTML = `<div class="flex items-center justify-between"><span>${originalText}</span></div>`;
                     th.querySelector('div').appendChild(select);
                 }
+            }
+
+            function addStatusMultiFilter(colIdx) {
+                const th = document.querySelectorAll('#project-table th')[colIdx];
+                const rows = document.querySelectorAll('#project-table tbody tr.project-row');
+                const values = new Set();
+                rows.forEach(row => {
+                    (row.getAttribute('data-status') || '').split(',').forEach(v => { if (v) values.add(v); });
+                });
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'relative ml-2';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'text-xs font-normal border border-slate-300 rounded px-1.5 py-0.5 bg-slate-50 text-slate-700 cursor-pointer shadow-sm flex items-center gap-1';
+                btn.innerHTML = '<span id="filter-status-label">全部</span><span class="material-symbols-outlined text-[14px]">expand_more</span>';
+                const panel = document.createElement('div');
+                panel.id = 'filter-status-panel';
+                panel.className = 'hidden absolute z-20 mt-1 left-0 bg-white border border-slate-200 rounded-lg shadow-lg p-2 flex flex-col gap-1 whitespace-nowrap';
+
+                Array.from(values).sort().forEach(val => {
+                    const label = document.createElement('label');
+                    label.className = 'flex items-center gap-1.5 text-xs font-normal text-slate-700 cursor-pointer px-1 py-0.5 hover:bg-slate-50 rounded';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.value = val;
+                    cb.className = 'status-filter-checkbox rounded border-slate-300';
+                    cb.onchange = () => { updateStatusFilterLabel(); applyDateFilter(); };
+                    label.appendChild(cb);
+                    label.appendChild(document.createTextNode(val));
+                    panel.appendChild(label);
+                });
+
+                btn.onclick = (e) => { e.stopPropagation(); panel.classList.toggle('hidden'); };
+                document.addEventListener('click', () => panel.classList.add('hidden'));
+                panel.onclick = (e) => e.stopPropagation();
+
+                wrapper.appendChild(btn);
+                wrapper.appendChild(panel);
+
+                const originalText = th.innerText;
+                th.innerHTML = `<div class="flex items-center justify-between"><span>${originalText}</span></div>`;
+                th.querySelector('div').appendChild(wrapper);
+            }
+
+            function updateStatusFilterLabel() {
+                const checked = Array.from(document.querySelectorAll('.status-filter-checkbox:checked')).map(cb => cb.value);
+                const label = document.getElementById('filter-status-label');
+                if (label) label.textContent = checked.length ? `已選 ${checked.length} 個` : '全部';
+            }
+
+            function getSelectedStatuses() {
+                return Array.from(document.querySelectorAll('.status-filter-checkbox:checked')).map(cb => cb.value);
             }
 
             function addFilterSelect(colIdx, id) {
@@ -1061,12 +1119,11 @@
                 const filterEndStr = document.getElementById('filter-end').value;     // e.g. "2026-01"
                 
                 const filterRepEl = document.getElementById('filter-rep');
-                const filterStatusEl = document.getElementById('filter-status');
                 const filterPersonnelEl = document.getElementById('filter-personnel');
                 const filterKeywordEl = document.getElementById('filter-keyword');
-                
+
                 const repVal = filterRepEl ? filterRepEl.value : '';
-                const statusVal = filterStatusEl ? filterStatusEl.value : '';
+                const statusVals = getSelectedStatuses();
                 const personnelVal = filterPersonnelEl ? filterPersonnelEl.value : '';
                 const keywordVal = filterKeywordEl ? filterKeywordEl.value.toLowerCase().trim() : '';
 
@@ -1083,26 +1140,26 @@
 
                 // Filter table rows (overlap check)
                 document.querySelectorAll('.project-row').forEach(row => {
-                    filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal);
+                    filterRow(row, filterStart, filterEnd, repVal, statusVals, personnelVal, keywordVal);
                 });
 
                 // Filter timeline rows (overlap check) + recompute bar positions
                 document.querySelectorAll('.timeline-project-row').forEach(row => {
-                    filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal);
+                    filterRow(row, filterStart, filterEnd, repVal, statusVals, personnelVal, keywordVal);
                 });
 
                 // Update timeline range to match filter
                 updateTimelineRange(filterStart, filterEnd);
             }
 
-            function filterRow(row, filterStart, filterEnd, repVal, statusVal, personnelVal, keywordVal) {
+            function filterRow(row, filterStart, filterEnd, repVal, statusVals, personnelVal, keywordVal) {
                 const startStr = row.getAttribute('data-start');
                 const endStr = row.getAttribute('data-end');
                 const rowRep = row.getAttribute('data-rep');
-                const rowStatus = row.getAttribute('data-status');
+                const rowStatusList = (row.getAttribute('data-status') || '').split(',').filter(Boolean);
                 const rowPersonnel = row.getAttribute('data-personnel') || '';
                 const rowName = row.getAttribute('data-name') || '';
-                
+
                 if (!startStr) { row.style.display = ''; return; }
 
                 const projStart = parseLocalDate(startStr);
@@ -1112,10 +1169,10 @@
                 // Check overlap: project overlaps with [filterStart, filterEnd]
                 if (filterStart && projEnd < filterStart) show = false;
                 if (filterEnd && projStart > filterEnd) show = false;
-                
-                // Exact match for rep, status, personnel and keyword if selected
+
+                // Exact match for rep, any-of-selected match for status, personnel and keyword if selected
                 if (show && repVal && rowRep !== repVal) show = false;
-                if (show && statusVal && rowStatus !== statusVal) show = false;
+                if (show && statusVals.length && !statusVals.some(s => rowStatusList.includes(s))) show = false;
                 if (show && personnelVal && !rowPersonnel.split(',').includes(personnelVal)) show = false;
                 if (show && keywordVal && !rowName.includes(keywordVal)) show = false;
 

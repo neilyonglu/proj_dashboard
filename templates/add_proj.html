@@ -43,13 +43,21 @@
                         <div class="flex flex-col gap-2">
                             <label class="text-sm font-semibold text-slate-700 dark:text-slate-300">狀態 <span
                                     class="text-red-500">*</span></label>
-                            <select name="status"
-                                class="form-input w-full rounded-lg border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 h-12 px-4 shadow-sm">
-                                <option value="進行中">進行中</option>
-                                <option value="等待中">等待中</option>
-                                <option value="暫緩中">暫緩中</option>
-                                <option value="已結案">已結案</option>
-                            </select>
+                            <div
+                                class="flex flex-wrap items-center gap-x-4 gap-y-2 h-12 px-4 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
+                                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="checkbox" name="status" value="進行中" checked
+                                        class="rounded border-slate-300 accent-primary">進行中</label>
+                                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="checkbox" name="status" value="等待中"
+                                        class="rounded border-slate-300 accent-primary">等待中</label>
+                                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="checkbox" name="status" value="暫緩中"
+                                        class="rounded border-slate-300 accent-primary">暫緩中</label>
+                                <label class="flex items-center gap-1.5 text-sm cursor-pointer">
+                                    <input type="checkbox" name="status" value="已結案"
+                                        class="rounded border-slate-300 accent-primary">已結案</label>
+                            </div>
                         </div>
                     </div>
 

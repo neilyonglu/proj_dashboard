@@ -335,6 +335,8 @@ def register(app):
             flash('請選擇 CSV 檔案', 'error')
             return redirect(url_for('manage_db'))
 
+        wipe_before_import = request.form.get('wipe_before_import') == '1'
+
         def _opt_hours(row, key):
             raw = row.get(key, '').strip()
             try:
@@ -343,9 +345,19 @@ def register(app):
                 return None
 
         try:
+            if wipe_before_import:
+                backup_database(reason='pre_task_wipe')
+                deleted = Task.query.delete()
+                db.session.commit()
+                log_action(request.remote_addr, '匯入前清空工作紀錄', f'deleted={deleted}')
+
             reader = _read_csv(file)
-            imported = 0
+            imported = skipped = 0
             error_list = []
+            seen = set(
+                (t.project_id, t.personnel, t.date, t.work_days, t.day_hours,
+                 t.overtime_hours, t.night_hours, t.description, t.notes)
+                for t in Task.query.all())
             for i, row in enumerate(reader, start=2):
                 proj_name = row.get('所屬專案', '').strip()
                 personnel = row.get('人員', '').strip()
@@ -366,17 +378,26 @@ def register(app):
                 except ValueError:
                     error_list.append(f'第 {i} 行日期或工作天數格式錯誤，已略過')
                     continue
+                day_hours = _opt_hours(row, '日班時數')
+                overtime_hours = _opt_hours(row, '加班時數')
+                night_hours = _opt_hours(row, '夜班時數')
+                sig = (project.id, personnel, task_date, work_days, day_hours,
+                       overtime_hours, night_hours, description, notes)
+                if sig in seen:
+                    skipped += 1
+                    continue
+                seen.add(sig)
                 db.session.add(Task(project_id=project.id, personnel=personnel, date=task_date,
-                                    work_days=work_days, day_hours=_opt_hours(row, '日班時數'),
-                                    overtime_hours=_opt_hours(row, '加班時數'),
-                                    night_hours=_opt_hours(row, '夜班時數'),
+                                    work_days=work_days, day_hours=day_hours,
+                                    overtime_hours=overtime_hours,
+                                    night_hours=night_hours,
                                     description=description, notes=notes))
                 imported += 1
             db.session.commit()
-            msg = f'✅ 工作紀錄匯入完成！新增 {imported} 筆。'
+            msg = f'✅ 工作紀錄匯入完成！新增 {imported} 筆，略過重複 {skipped} 筆。'
             if error_list:
                 msg += f'（{len(error_list)} 筆錯誤）'
-            log_action(request.remote_addr, '匯入工時 CSV', f'imported={imported}')
+            log_action(request.remote_addr, '匯入工時 CSV', f'imported={imported}, skipped={skipped}')
             flash(msg, 'success')
             for err in error_list[:5]:
                 flash(err, 'error')

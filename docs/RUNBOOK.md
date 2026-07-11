@@ -77,6 +77,23 @@ Use the env's python directly (avoids conda PATH issues entirely):
 DB lives at `instance\app.db`; automatic backups in `instance\backups\` (keep 10).
 Before any schema experiment, copy `instance\app.db` aside first.
 
+**Trap (cost real data, 2026-07-11):** to test a DB-destructive route (e.g. a
+"wipe before import" feature) in isolation, do NOT `from app import app` and then
+override `app.config['SQLALCHEMY_DATABASE_URI']` afterward, expecting queries to
+use the new path. This project's Flask-SQLAlchemy binds the engine at
+`db.init_app(app)` time (inside `app.py`, at import time) — config changes made
+after that are silently ignored by `Model.query`, so ORM reads/writes still hit
+the REAL `instance/app.db` even though plain-file-path helpers (like
+`backup_database()`, which re-reads `current_app.config['DB_INSTANCE_DIR']` live)
+correctly honor the override. This split made a test look isolated while it
+actually deleted 171 real rows from the live task table.
+Safe alternative: copy `instance\app.db` aside FIRST (always, no exceptions,
+even for "isolated" tests), then either (a) test pure Python helper functions
+directly against a copy via raw `sqlite3`/a fresh throwaway `Flask`+`SQLAlchemy()`
+app object that's never touched the real one, or (b) accept that testing through
+the real `app` object means you're on the real DB and restore from the pre-test
+copy afterward regardless of whether the test "looked" isolated.
+
 ## Build the exe
 
 ```powershell
