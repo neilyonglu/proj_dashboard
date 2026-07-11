@@ -45,7 +45,7 @@ app.config['DB_ADMIN_PASSWORD'] = os.environ.get('DB_ADMIN_PASSWORD', 'admin123'
 from core.extensions import db
 db.init_app(app)
 
-APP_VERSION = '1.3.2'
+APP_VERSION = '1.3.2.1'
 app.config['APP_VERSION'] = APP_VERSION
 app.config['APPLICATION_PATH'] = application_path
 

@@ -51,7 +51,7 @@ def register(app):
     def add_proj():
         if request.method == 'POST':
             name = request.form.get('name')
-            status = ','.join(request.form.getlist('status'))
+            status = request.form.get('status')
             category = request.form.get('category')
             rep = request.form.get('rep')
             equipment = request.form.get('equipment')
@@ -98,7 +98,7 @@ def register(app):
         project = Project.query.get_or_404(id)
         if request.method == 'POST':
             project.name = request.form.get('name')
-            project.status = ','.join(request.form.getlist('status'))
+            project.status = request.form.get('status')
             project.category = request.form.get('category')
             project.rep = request.form.get('rep')
             project.equipment = request.form.get('equipment')

@@ -88,12 +88,11 @@ Admin, session-gated (`admin.py`, `manage.py`):
   `templates/proj_timeline.html` (~line 402), NOT in `static/js/main.js` (that file
   is combobox code). `new Date('YYYY-MM-DD')` is treated as UTC and shifts months
   (April bled into May).
-- `Project.status` holds a comma-joined string of one or more of 進行中/等待中/
-  暫緩中/已結案 (multi-select checkboxes in add/edit forms, since v1.3.2) — never
-  compare it with `==`; always `.split(',')` first or use `.contains()` for a
-  single-value match (`core/routes/main.py`'s active-project count and
-  `STATUS_COLORS` lookup already do this — the latter keys off only the first
-  token, `primary_status`, since the timeline bar only has room for one tag).
+- `Project.status` holds a single value, one of 進行中/等待中/暫緩中/已結案, set via
+  a dropdown in the add/edit forms. The project list/timeline/manage-DB table
+  status filters are multi-select (any-of match against each row's single value)
+  — that multi-select lives only in those table filters, not in the project's
+  own status field.
 - `Personnel.resigned_date` (nullable `Date`) marks former employees; `NULL` =
   active. `/employee-case`'s personnel dropdown filters to active only
   (`core/routes/main.py`), but a resigned person is still reachable by direct

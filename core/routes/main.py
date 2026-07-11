@@ -8,7 +8,7 @@ def register(app):
 
     @app.route('/')
     def index():
-        active_projects_count = Project.query.filter(Project.status.contains('進行中')).count()
+        active_projects_count = Project.query.filter_by(status='進行中').count()
         total_personnel = Personnel.query.count()
         today = date.today()
         start_of_month = date(today.year, today.month, 1)
@@ -227,11 +227,9 @@ def register(app):
                     'night_hours': t.night_hours, 'desc': t.description
                 })
 
-            primary_status = (p.status or '').split(',')[0]
             timeline_data.append({
                 'proj': p, 'left': left_percent, 'width': width_percent,
-                'tag_class': STATUS_COLORS.get(primary_status, 'bg-slate-500'),
-                'primary_status': primary_status,
+                'tag_class': STATUS_COLORS.get(p.status, 'bg-slate-500'),
                 'segments': segments
             })
 

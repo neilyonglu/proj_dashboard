@@ -22,7 +22,7 @@ class Category(db.Model):
 class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    status = db.Column(db.String(50), nullable=False)  # comma-joined, e.g. "進行中,等待中"
+    status = db.Column(db.String(20), nullable=False)
     rep = db.Column(db.String(50), nullable=False)
     equipment = db.Column(db.String(100), nullable=True)
     category = db.Column(db.String(50), nullable=False)
