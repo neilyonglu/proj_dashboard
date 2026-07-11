@@ -126,10 +126,48 @@ Get-Content "C:\Users\Neil\project\dad_projects\proj_dashboard\exe_test.log"
 Invoke-WebRequest -Uri "http://localhost:5001/" -UseBasicParsing
 ```
 
-`build.bat` already calls conda internally (commit a16a578) and deletes the .spec.
-Output `proj_dash.exe` must sit next to `templates\` and `static\` to run.
-It also produces `proj_dash_update.zip` (exe + templates + static) — upload this
-as the GitHub Release asset so the in-app "一鍵更新" can find it (README "發布新版本").
+Output `proj_dash.exe` must sit next to `templates\` and `static\` to run. Also
+produces `proj_dash_update.zip` (exe+templates+static, for in-app update) and
+`proj_dash_installer.exe` (standalone manual installer) — both are release assets.
+
+## Publish a GitHub Release (after `build.bat`)
+
+No `gh` CLI in this environment. Use the GitHub API with the token from the
+existing git credential (never echo the token itself):
+
+```bash
+TOKEN=$(printf 'protocol=https\nhost=github.com\n\n' | git credential fill | sed -n 's/^password=//p')
+```
+
+Building the JSON body: `curl --data-urlencode` mangles Chinese text when the
+value comes through PowerShell (console codepage), and Git Bash's `python3` is
+a non-functional Windows Store stub (`exit 49`) — always build the JSON with the
+conda env's real python, writing to a Windows-style path (`/tmp/...` resolves
+to `C:\tmp\...` for a native Windows python.exe and silently fails):
+
+```bash
+export REL_BODY="release notes text, may contain 中文"
+"/c/Users/Neil/miniconda3/envs/proj_dash/python.exe" -c "
+import json, os
+payload = {'tag_name':'vX.Y.Z','target_commitish':'main','name':'vX.Y.Z','body':os.environ['REL_BODY'],'draft':False,'prerelease':False}
+with open(r'<scratchpad>\release_payload.json','w',encoding='utf-8') as f:
+    json.dump(payload, f, ensure_ascii=False)
+"
+curl -s -X POST "https://api.github.com/repos/neilyonglu/proj_dashboard/releases" \
+  -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.github+json" \
+  --data-binary "@<scratchpad>/release_payload.json"
+```
+
+Grab `id` from the response, then upload each asset (repeat per file):
+
+```bash
+curl -s -X POST "https://uploads.github.com/repos/neilyonglu/proj_dashboard/releases/<id>/assets?name=proj_dash_update.zip" \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/zip" \
+  --data-binary "@proj_dash_update.zip"
+```
+
+Verify: `curl -s https://api.github.com/repos/neilyonglu/proj_dashboard/releases/latest`
+should show the new `tag_name` and both assets with `"state":"uploaded"`.
 
 ## Known traps (Windows / this project)
 
