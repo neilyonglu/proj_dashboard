@@ -1,6 +1,6 @@
 # 專案管理與工時追蹤系統 (Project Dashboard)
 
-> **版本：v1.3.2.1**
+> **版本：v1.4.0**
 
 一個基於 Python Flask 開發的輕量級企業內部專案與人員工時管理系統。提供直覺的介面來管理專案進度、人員工作紀錄、並具備甘特圖式的時間軸檢視以及完整的資料庫匯入/匯出功能。
 
@@ -22,8 +22,7 @@
     *   **CSV 匯出/匯入**：支援一鍵備份資料為 CSV，並支援上傳 CSV 進行批量新增或覆蓋更新（自動處理 Excel 產生的 BIG5 編碼與 UTF-8-BOM 問題）；工作紀錄匯入會自動略過完全重複的資料，也可選擇「匯入前清空所有工作紀錄」。
     *   **全庫匯出 (Excel)**：一次匯出整個資料庫成單一 `.xlsx` 檔，每個資料表各一個分頁。
     *   **資料庫備份/還原**：每天自動備份資料庫一次（啟動時檢查＋伺服器持續運作時每小時檢查一次，保留最近 10 份），並可在後台一鍵「立即備份」、「下載備份」與「還原備份」（還原前會自動先備份目前資料）。
-    *   **一鍵更新／手動安裝**：可偵測 GitHub 上的新版本並一鍵下載重啟，或下載獨立的 `proj_dash_installer.exe` 雙擊手動安裝；兩者都只覆寫真的有變動的檔案，不會動到 `instance/app.db` 與備份。
-*   **📋 操作日誌 (Activity Log)**：所有寫入操作（新增／編輯／刪除／匯入／備份、登入成功與失敗）皆自動記錄至 `instance/logs/` 目錄，格式為 `[時間] IP | 操作 | 細節`，每個月份自動分檔（每檔上限 2000 筆）。
+*   **📋 操作日誌 (Activity Log)**：所有寫入操作（新增／編輯／刪除／匯入／備份、登入成功與失敗）皆自動記錄至 `data/instance/logs/` 目錄，格式為 `[時間] IP | 操作 | 細節`，每個月份自動分檔（每檔上限 2000 筆）。
 
 ## 🛠️ 技術棧 (Tech Stack)
 
@@ -31,41 +30,113 @@
 *   **資料庫**: SQLite (`app.db`)
 *   **前端**: HTML5, Tailwind CSS (透過 CDN), Material Symbols (Icons)
 *   **伺服器**: Waitress (WSGI Production Server)
+*   **部署**: Docker (`python:3.12-slim`，非 root 執行)
 
 ## 📁 專案結構 (Project Structure)
 
 ```text
 proj_dashboard/
 ├── app.py                 # 應用程式進入點（Flask 初始化、設定、啟動）
+├── Dockerfile             # python:3.12-slim，非 root 執行，waitress 監聽 5001
+├── docker-compose.yml     # build args UID/GID + instance/ 與 avatars/ bind mount
+├── requirements.txt       # 鎖版本的執行期相依套件
+├── .dockerignore
+├── .env                   # 環境變數（需手動建立, 已被 .gitignore 排除）
+├── .env.example           # .env 範本
 ├── core/                  # 核心應用模組
 │   ├── extensions.py      # SQLAlchemy db 實例
 │   ├── models.py          # 資料庫模型（Project, Task, Personnel, ...）
 │   ├── helpers.py         # 工具函式（備份＋每日排程、Migration、表單解析）
-│   ├── updater.py         # 版本檢查與一鍵自我更新（下載/替換/重啟）
 │   ├── activity_log.py    # 操作日誌寫入模組
 │   └── routes/            # 路由模組
 │       ├── main.py        # 儀表板、時間軸、員工頁、加班統計
 │       ├── projects.py    # 專案 CRUD
 │       ├── tasks.py       # 工時紀錄 CRUD
-│       ├── admin.py       # 後台登入、備份 API、自我更新 API、CSV 匯出/匯入
+│       ├── admin.py       # 後台登入、備份 API、CSV/Excel 匯出匯入
 │       └── manage.py      # 人員、代表、分類管理
-├── build.bat              # Windows 打包執行檔腳本 (PyInstaller)，同時產生 proj_dash_update.zip
-├── .env                   # 環境變數設定檔 (需手動建立, 已被 .gitignore 排除)
-├── instance/              # 執行期資料 (已被 .gitignore 排除)
-│   ├── app.db             # SQLite 資料庫檔案 (系統自動建立)
-│   ├── backups/           # 資料庫備份檔 (系統自動建立, 保留最近 10 份)
-│   └── logs/              # 操作日誌 (activity_YYYYMM_NNN.log)
+├── data/                  # 主機端執行期資料（bind mount, 已被 .gitignore 排除）
+│   ├── instance/          # app.db、backups/（保留最近 10 份）、logs/
+│   └── avatars/           # 人員大頭貼
 ├── static/
-│   └── avatars/           # 人員大頭貼上傳目錄
 └── templates/             # HTML 渲染模板
-    ├── base.html          # 共用版型 (Navbar)
-    ├── index.html         # 首頁儀表板
-    ├── proj_timeline.html # 專案時間軸 (甘特圖)
-    ├── employee_case.html # 人員專屬頁面
-    ├── overtime_stats.html# 加班統計
-    ├── manage_db*.html    # 資料庫管理相關頁面
-    └── ...
 ```
+
+## 🚀 部署 (Docker)
+
+本系統僅以 Docker 部署於 Linux，不提供 Windows exe 打包與 App 內自動更新。
+
+```bash
+git clone https://github.com/neilyonglu/proj_dashboard.git
+cd proj_dashboard
+
+cp .env.example .env
+python3 -c "import secrets; print(secrets.token_hex(32))"   # 產生 SECRET_KEY
+
+# 編輯 .env，填入 SECRET_KEY 與 DB_ADMIN_PASSWORD（兩者皆必填，未填程式拒絕啟動）
+nano .env
+
+# 容器以此 UID/GID 執行，確保 bind mount 可寫且檔案歸屬主機使用者
+printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" >> .env
+
+mkdir -p data/instance data/avatars
+docker compose up -d --build
+docker compose logs -f
+```
+
+服務綁定在 `127.0.0.1:5001`，不對外開放。遠端存取請走 SSH 通道：
+
+```bash
+ssh -L 5001:127.0.0.1:5001 <user>@<server>
+```
+
+再於本機瀏覽器開啟 <http://localhost:5001>。
+
+### 資料位置
+
+| 主機路徑 | 容器內路徑 | 內容 |
+|---|---|---|
+| `./data/instance` | `/app/instance` | `app.db`、`backups/`、`logs/` |
+| `./data/avatars` | `/app/static/avatars` | 人員大頭貼 |
+
+兩者皆為 bind mount，重建 image 不會被覆蓋，可直接用 `scp` / `rsync` 備份整個 `data/`。
+
+### 更新版本
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+只重建 image，`data/` 完全不動。更新前建議先在後台按一次「立即備份」。
+
+### 常用維運指令
+
+```bash
+docker compose ps                  # 檢視容器狀態與健康檢查
+docker compose logs -f --tail 100  # 追蹤即時日誌
+docker compose restart             # 重啟
+docker compose down                # 停止並移除容器（資料保留在 data/）
+du -sh data/instance/backups       # 檢查備份佔用空間
+docker image prune -f              # 清理重建後殘留的舊 image
+```
+
+### 環境變數
+
+| 變數 | 必填 | 說明 |
+|---|---|---|
+| `SECRET_KEY` | ✅ | Flask session 簽章金鑰 |
+| `DB_ADMIN_PASSWORD` | ✅ | 資料庫管理頁密碼 |
+| `PORT` | | 監聽埠，預設 `5001` |
+| `TZ` | | 時區，image 預設 `Asia/Taipei` |
+| `UID` / `GID` | | 容器執行身分，預設 `1000` |
+
+## 💡 使用說明
+
+1. **首次啟動**：系統會自動建立 `data/instance/app.db`，並預先寫入預設的業務代表、專案種類與人員名單。若資料庫為舊版，啟動時會自動補上新欄位（時數欄）。
+2. **新增專案**：點擊導覽列的「新增專案」，填寫基本資訊。如果輸入了系統中不存在的業務代表或種類，系統會自動將其加入選項中。
+3. **資料庫管理**：點擊首頁「資料庫管理」（需先登入，未登入時顯示鎖頭），輸入 `.env` 中設定的 `DB_ADMIN_PASSWORD`。可在此下載 CSV 備份、匯入修改後的 CSV，或使用「立即備份 / 下載備份 / 還原備份」管理整個 `.db` 檔。
+4. **資料庫備份與還原**：每天自動在 `data/instance/backups/` 建立一次備份（啟動時檢查一次，之後每小時再檢查一次），最多保留最近 10 份。還原時上傳先前下載的 `.db` 檔，系統會在覆蓋前自動先備份目前資料（`pre_restore`）。
+5. **操作日誌**：所有操作記錄在 `data/instance/logs/activity_YYYYMM_NNN.log`，可直接用文字編輯器開啟查閱。
 
 ## 🚀 安裝與執行 (Installation & Setup)
 
@@ -136,6 +207,15 @@ proj_dashboard/
 5. **操作日誌**：所有操作記錄在 `instance/logs/activity_YYYYMM_NNN.log`，可用文字編輯器直接開啟查閱。
 
 ## 📋 版本紀錄 (Changelog)
+
+### v1.4.0
+
+- **改為 Docker 部署**：新增 `Dockerfile`、`docker-compose.yml`、`requirements.txt`、`.env.example`；容器以非 root 執行，`instance/` 與 `static/avatars/` 改為主機 bind mount
+- **移除 Windows 專用程式碼**：刪除 `build.bat`、`tools/installer.py`、`core/updater.py`、`docs/RUNBOOK.md`，以及首頁與後台的「檢查更新／一鍵更新／手動安裝更新」介面。更新方式改為 `git pull` + `docker compose up -d --build`
+- **密碼不再有預設值**：`SECRET_KEY` 與 `DB_ADMIN_PASSWORD` 未設定時程式直接拒絕啟動（原本會退回 `admin123`）
+- **`.env` 不再覆寫環境變數**：改用 `setdefault`，容器傳入的變數優先於 `.env` 檔內容
+- **修正時區與日誌輸出**：image 設定 `TZ=Asia/Taipei` 與 `PYTHONUNBUFFERED=1`，備份檔名、`instance/logs/` 時間與 `docker logs` 皆正常（原本在容器內會是 UTC）
+- **修正 CSV 匯入編碼**：實際支援 UTF-8 / UTF-8-BOM / CP950 / BIG5（原本只解 UTF-8，遇 Excel 產生的 BIG5 檔會直接失敗）
 
 ### v1.3.2.1
 - **專案狀態改回單選**：新增/編輯專案時的狀態欄位改回單選下拉選單（v1.3.2 誤把它也改成可複選）；專案列表、時間軸、資料庫管理頁的狀態「篩選」維持可複選不變

@@ -2,17 +2,14 @@ import csv
 import io
 import os
 import shutil
-import threading
-import time
 from datetime import datetime
 
-from flask import render_template, request, redirect, url_for, flash, session, send_file, Response, jsonify
+from flask import render_template, request, redirect, url_for, flash, session, send_file, Response
 from openpyxl import Workbook
 from ..extensions import db
 from ..models import Project, Task, Personnel, Representative, Category
 from ..helpers import backup_database, ensure_task_columns, BACKUP_KEEP
 from ..activity_log import log_action
-from ..updater import check_for_update, perform_self_update
 
 
 def _require_auth():
@@ -116,33 +113,6 @@ def register(app):
             flash(f'還原失敗：{str(e)}', 'error')
         return redirect(url_for('manage_db'))
 
-    # ── Self-update ───────────────────────────────────────────────────────────
-
-    @app.route('/api/check-update')
-    def check_update():
-        info = check_for_update(app.config['APP_VERSION'])
-        return jsonify(info)
-
-    @app.route('/api/update-now', methods=['POST'])
-    def update_now():
-        if not session.get('db_admin_auth'):
-            return jsonify({'ok': False, 'error': '請先登入管理者'}), 403
-        info = check_for_update(app.config['APP_VERSION'], force=True)
-        if not info.get('available'):
-            return jsonify({'ok': False, 'error': '目前已是最新版本，或無法取得更新資訊'}), 400
-        try:
-            perform_self_update(info['download_url'], app.config['APPLICATION_PATH'])
-        except Exception as e:
-            return jsonify({'ok': False, 'error': str(e)}), 500
-
-        log_action(request.remote_addr, '觸發自動更新', f"latest_version={info['latest_version']}")
-
-        def _delayed_exit():
-            time.sleep(1.5)
-            os._exit(0)
-        threading.Thread(target=_delayed_exit, daemon=True).start()
-        return jsonify({'ok': True, 'message': f"正在更新到 v{info['latest_version']}，程式即將自動重啟，請稍候..."})
-
     # ── CSV helpers ───────────────────────────────────────────────────────────
 
     def _csv_response(rows, headers, filename):
@@ -156,7 +126,17 @@ def register(app):
                         headers={'Content-Disposition': f'attachment;filename={filename}'})
 
     def _read_csv(file):
-        content = file.read().decode('utf-8-sig')
+        """Decode an uploaded CSV. Excel on zh-TW Windows writes CP950/BIG5,
+        so fall back to it before giving up."""
+        raw = file.read()
+        for enc in ('utf-8-sig', 'cp950', 'big5'):
+            try:
+                content = raw.decode(enc)
+                break
+            except UnicodeDecodeError:
+                continue
+        else:
+            content = raw.decode('utf-8', errors='replace')
         return csv.DictReader(io.StringIO(content))
 
     # ── Full DB export (single .xlsx, one sheet per table) ──────────────────────

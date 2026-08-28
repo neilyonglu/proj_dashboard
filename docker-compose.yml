@@ -1,0 +1,23 @@
+services:
+  dashboard:
+    build:
+      context: .
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    image: proj_dashboard:latest
+    container_name: proj_dashboard
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Taipei
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - ./data/instance:/app/instance
+      - ./data/avatars:/app/static/avatars
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

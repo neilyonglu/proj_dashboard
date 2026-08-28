@@ -6,22 +6,6 @@
 
 <div class="fixed top-3 right-4 z-50 text-xs font-medium text-slate-400 dark:text-slate-500 select-none pointer-events-none">v{{ app_version }}</div>
 
-<div id="update-banner" class="hidden fixed top-0 left-0 right-0 z-40 bg-primary text-white text-sm font-medium text-center py-2 px-4">
-    <span id="update-banner-text"></span>
-    <a href="{{ url_for('manage_db_login') }}" class="underline ml-2 hover:opacity-80">前往後台更新</a>
-</div>
-<script>
-    fetch("{{ url_for('check_update') }}")
-        .then(r => r.json())
-        .then(info => {
-            if (info.available) {
-                document.getElementById('update-banner-text').textContent =
-                    '🆕 有新版本 v' + info.latest_version + ' 可更新';
-                document.getElementById('update-banner').classList.remove('hidden');
-            }
-        })
-        .catch(() => {});
-</script>
 
 <main class="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-[1000px] mx-auto mt-16 md:mt-0">
     <div class="flex flex-col items-center text-center gap-4 mb-16">

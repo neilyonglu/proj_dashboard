@@ -1,17 +1,12 @@
 import os
-import sys
 
 from flask import Flask
 
-# ── Path detection (works for both Python script and PyInstaller bundle) ──────
-if getattr(sys, 'frozen', False):
-    application_path = os.path.dirname(sys.executable)
-else:
-    application_path = os.path.dirname(os.path.abspath(__file__))
+APP_VERSION = '1.4.0'
 
-os.chdir(application_path)
+application_path = os.path.dirname(os.path.abspath(__file__))
 
-# ── Load .env manually ────────────────────────────────────────────────────────
+# ── Load .env (existing environment variables always win) ─────────────────────
 env_path = os.path.join(application_path, '.env')
 if os.path.exists(env_path):
     with open(env_path, 'r', encoding='utf-8') as f:
@@ -19,47 +14,57 @@ if os.path.exists(env_path):
             line = line.strip()
             if line and not line.startswith('#') and '=' in line:
                 k, v = line.split('=', 1)
-                os.environ[k.strip()] = v.strip()
+                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
-# ── Flask app setup ───────────────────────────────────────────────────────────
-instance_dir = os.path.join(application_path, 'instance')
+# ── Required secrets ──────────────────────────────────────────────────────────
+SECRET_KEY = os.environ.get('SECRET_KEY')
+DB_ADMIN_PASSWORD = os.environ.get('DB_ADMIN_PASSWORD')
+if not SECRET_KEY or not DB_ADMIN_PASSWORD:
+    raise RuntimeError(
+        'SECRET_KEY 與 DB_ADMIN_PASSWORD 為必填，請在 .env 或容器環境變數中設定。'
+    )
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+instance_dir = os.environ.get('INSTANCE_DIR', os.path.join(application_path, 'instance'))
 os.makedirs(instance_dir, exist_ok=True)
 db_file_path = os.path.join(instance_dir, 'app.db')
 
 upload_path = os.path.join(application_path, 'static', 'avatars')
 os.makedirs(upload_path, exist_ok=True)
 
+# ── Flask app setup ───────────────────────────────────────────────────────────
 app = Flask(__name__,
             template_folder=os.path.join(application_path, 'templates'),
             static_folder=os.path.join(application_path, 'static'))
 
-app.secret_key = os.environ.get('SECRET_KEY', 'super_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_file_path.replace('\\', '/')
+app.secret_key = SECRET_KEY
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_file_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = upload_path
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
 app.config['DB_FILE_PATH'] = db_file_path
 app.config['DB_INSTANCE_DIR'] = instance_dir
-app.config['DB_ADMIN_PASSWORD'] = os.environ.get('DB_ADMIN_PASSWORD', 'admin123')
+app.config['DB_ADMIN_PASSWORD'] = DB_ADMIN_PASSWORD
+app.config['APP_VERSION'] = APP_VERSION
 
 from core.extensions import db
 db.init_app(app)
 
-APP_VERSION = '1.3.2.1'
-app.config['APP_VERSION'] = APP_VERSION
-app.config['APPLICATION_PATH'] = application_path
 
 @app.context_processor
 def inject_app_version():
     return {'app_version': APP_VERSION}
 
+
 # ── Register all routes ───────────────────────────────────────────────────────
 from core.routes import register_routes
 register_routes(app)
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-if __name__ == '__main__':
-    from core.helpers import backup_database, ensure_task_columns, ensure_personnel_columns, start_daily_backup_scheduler
+
+def bootstrap():
+    """Create/migrate the DB and seed defaults. Safe to call more than once."""
+    from core.helpers import (backup_database, ensure_task_columns,
+                              ensure_personnel_columns, start_daily_backup_scheduler)
     from core.models import Representative, Category, Personnel, Task
 
     with app.app_context():
@@ -96,6 +101,12 @@ if __name__ == '__main__':
 
     start_daily_backup_scheduler(app)
 
-    print("系統已啟動，請開啟瀏覽器輸入 http://localhost:5001")
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+if __name__ == '__main__':
+    bootstrap()
+    host = os.environ.get('HOST', '0.0.0.0')
+    port = int(os.environ.get('PORT', '5001'))
+    print(f'系統已啟動：http://{host}:{port}', flush=True)
     from waitress import serve
-    serve(app, host='0.0.0.0', port=5001)
+    serve(app, host=host, port=port)

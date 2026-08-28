@@ -4,21 +4,15 @@
 # Claude Code project instructions (local only)
 CLAUDE.md
 
-# Build output
-*.exe
-
-# Runtime data (database + auto backups + uploaded avatars are local)
+# Runtime data (database + backups + logs + uploaded avatars)
 instance/
+data/
+static/avatars/*
+!static/avatars/.gitkeep
 
 # Python
 __pycache__/
 *.pyc
-
-# PyInstaller build artifacts
-build/
-build_tmp/
-dist/
-*.spec
 
 # CodeGraph local index (not for version control)
 .codegraph/

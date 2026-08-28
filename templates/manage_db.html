@@ -43,25 +43,7 @@
                     <span class="material-symbols-outlined text-[15px]">restore</span>還原備份
                 </button>
             </form>
-            <button type="button" id="check-update-btn" onclick="checkForUpdate()"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
-                title="檢查是否有新版本">
-                <span class="material-symbols-outlined text-[15px]">system_update</span>檢查更新
-            </button>
-            <a href="https://github.com/neilyonglu/proj_dashboard/releases/latest" target="_blank" rel="noopener"
-                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
-                title="下載 proj_dash_installer.exe，雙擊即可手動安裝更新（不會動到資料庫）">
-                <span class="material-symbols-outlined text-[15px]">install_desktop</span>手動安裝更新
-            </a>
         </div>
-    </div>
-
-    <div id="update-result" class="hidden px-6 py-2 border-b border-slate-200 bg-blue-50 text-sm text-blue-800 flex items-center gap-3">
-        <span id="update-result-text"></span>
-        <button type="button" id="update-now-btn" onclick="updateNow()"
-            class="hidden px-3 py-1 rounded-lg text-xs font-semibold text-white bg-primary hover:bg-primary/90 transition-colors">
-            立即更新
-        </button>
     </div>
 
     <!-- Tab buttons -->
@@ -573,59 +555,7 @@
 
 {% block scripts %}
 <script>
-    // ── Self-update ─────────────────────────────────────────────────
-    let pendingUpdate = null;
-
-    function checkForUpdate() {
-        const btn = document.getElementById('check-update-btn');
-        btn.disabled = true;
-        fetch("{{ url_for('check_update') }}")
-            .then(r => r.json())
-            .then(info => {
-                btn.disabled = false;
-                const box = document.getElementById('update-result');
-                const text = document.getElementById('update-result-text');
-                const updateBtn = document.getElementById('update-now-btn');
-                box.classList.remove('hidden');
-                if (info.available) {
-                    pendingUpdate = info;
-                    text.textContent = '🆕 有新版本 v' + info.latest_version + ' 可更新';
-                    updateBtn.classList.remove('hidden');
-                } else if (info.error) {
-                    text.textContent = '檢查更新失敗：' + info.error;
-                    updateBtn.classList.add('hidden');
-                } else {
-                    text.textContent = '✅ 目前已是最新版本 (v' + (info.latest_version || '') + ')';
-                    updateBtn.classList.add('hidden');
-                }
-            })
-            .catch(() => { btn.disabled = false; });
-    }
-
-    function updateNow() {
-        if (!pendingUpdate) return;
-        if (!confirm('確定要更新到 v' + pendingUpdate.latest_version + ' 嗎？\n\n程式會自動下載、關閉並重新啟動，過程中網頁會短暫無法連線。')) {
-            return;
-        }
-        const text = document.getElementById('update-result-text');
-        const updateBtn = document.getElementById('update-now-btn');
-        updateBtn.disabled = true;
-        text.textContent = '正在下載並套用更新，請稍候...';
-        fetch("{{ url_for('update_now') }}", { method: 'POST' })
-            .then(r => r.json())
-            .then(res => {
-                if (res.ok) {
-                    text.textContent = res.message;
-                } else {
-                    text.textContent = '更新失敗：' + res.error;
-                    updateBtn.disabled = false;
-                }
-            })
-            .catch(() => {
-                text.textContent = '已送出更新請求，程式即將重啟（此為預期中的連線中斷）。';
-            });
-    }
-
+    
     // ── Modal helpers ───────────────────────────────────────────────
     const tabLabels = { projects: '專案', tasks: '工作紀錄', reps: '業務代表', personnel: '參與人員', categories: '專案種類' };
 

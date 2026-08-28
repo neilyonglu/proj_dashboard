@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.example
+instance/
+data/
+docs/
+README.md
+使用手冊.md
+__pycache__/
+*.pyc
+*.db
+.codegraph/
+CLAUDE.md

@@ -83,14 +83,14 @@ def backup_database(reason='auto', once_per_day=False):
     if once_per_day:
         already = [f for f in os.listdir(backups_dir) if f.endswith('.db') and today in f]
         if already:
-            print(f'今日已有備份，略過本次備份。')
+            print('今日已有備份，略過本次備份。', flush=True)
             return None
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     dest = os.path.join(backups_dir, f'app_{reason}_{timestamp}.db')
     try:
         shutil.copy2(db_file_path, dest)
     except Exception as e:
-        print(f'備份失敗：{e}')
+        print(f'備份失敗：{e}', flush=True)
         return None
     try:
         backups = sorted(
@@ -101,7 +101,7 @@ def backup_database(reason='auto', once_per_day=False):
         for old in backups[BACKUP_KEEP:]:
             os.remove(os.path.join(backups_dir, old))
     except Exception as e:
-        print(f'清理舊備份失敗：{e}')
+        print(f'清理舊備份失敗：{e}', flush=True)
     return dest
 
 
