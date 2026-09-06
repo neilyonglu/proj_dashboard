@@ -33,6 +33,11 @@
                 title="匯出整個資料庫為一個 Excel 檔（每張表一個分頁）">
                 <span class="material-symbols-outlined text-[15px]">table_view</span>全部匯出 (Excel)
             </a>
+            <button type="button" onclick="openImportAllModal()"
+                class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors flex items-center gap-1.5 border border-slate-200"
+                title="從「全部匯出」產生的 .xlsx 檔匯入整個資料庫">
+                <span class="material-symbols-outlined text-[15px]">upload_file</span>全部匯入 (Excel)
+            </button>
             <form action="{{ url_for('backup_restore') }}" method="POST" enctype="multipart/form-data" class="inline"
                 id="restore-form">
                 <input type="file" name="db_file" accept=".db" class="hidden" id="restore-file-input"
@@ -142,8 +147,8 @@
                         <input type="checkbox" name="wipe_before_import" value="1" id="wipe-before-import-checkbox"
                             class="mt-0.5 accent-red-600">
                         <div>
-                            <p class="text-sm font-medium text-red-700">匯入前清空所有工作紀錄</p>
-                            <p class="text-xs text-red-500">會先自動備份資料庫，再清空全部工作紀錄，然後匯入這份 CSV。此操作無法復原（可從備份還原）。</p>
+                            <p class="text-sm font-medium text-red-700" id="wipe-title">匯入前清空所有工作紀錄</p>
+                            <p class="text-xs text-red-500" id="wipe-desc">會先自動備份資料庫，再清空全部工作紀錄，然後匯入這份 CSV。此操作無法復原（可從備份還原）。</p>
                         </div>
                     </label>
                 </div>
@@ -559,24 +564,60 @@
     // ── Modal helpers ───────────────────────────────────────────────
     const tabLabels = { projects: '專案', tasks: '工作紀錄', reps: '業務代表', personnel: '參與人員', categories: '專案種類' };
 
-    function openImportModal(tabName, actionUrl, hasMode, hintText, hasWipe) {
+    let currentDropLabel = '點擊選擇或拖曳 CSV 檔案到這裡';
+    let currentWipeConfirmMsg = '確定要先清空「所有」工作紀錄，再匯入這份 CSV 嗎？\n\n目前的資料會先自動備份，但清空動作本身無法復原（需從備份手動還原）。';
+
+    function openImportModal(tabName, actionUrl, hasMode, hintText, hasWipe, opts) {
+        opts = opts || {};
+        const fieldName = opts.fieldName || 'csv_file';
+        const accept = opts.accept || '.csv';
+        const fileLabel = opts.fileTypeLabel || 'CSV';
+        currentDropLabel = '點擊選擇或拖曳 ' + fileLabel + ' 檔案到這裡';
+
         // Set form target
         document.getElementById('import-form').action = actionUrl;
-        document.getElementById('modal-title').textContent = '匯入 ' + tabName + ' CSV';
+        document.getElementById('modal-title').textContent = '匯入 ' + tabName + ' ' + fileLabel;
         document.getElementById('modal-hint').textContent = hintText;
+        // File input field name / accepted extension
+        const fileInput = document.getElementById('csv-file-input');
+        fileInput.name = fieldName;
+        fileInput.accept = accept;
         // Show/hide duplicate mode section
         document.getElementById('modal-mode-section').style.display = hasMode ? '' : 'none';
-        // Show/hide wipe-before-import section (tasks only)
+        // Show/hide wipe-before-import section
         document.getElementById('modal-wipe-section').classList.toggle('hidden', !hasWipe);
         document.getElementById('wipe-before-import-checkbox').checked = false;
+        if (hasWipe) {
+            document.getElementById('wipe-title').textContent = opts.wipeTitle || '匯入前清空所有工作紀錄';
+            document.getElementById('wipe-desc').textContent = opts.wipeDesc ||
+                '會先自動備份資料庫，再清空全部工作紀錄，然後匯入這份 CSV。此操作無法復原（可從備份還原）。';
+            currentWipeConfirmMsg = opts.wipeConfirm ||
+                '確定要先清空「所有」工作紀錄，再匯入這份 CSV 嗎？\n\n目前的資料會先自動備份，但清空動作本身無法復原（需從備份手動還原）。';
+        }
         // Reset file input
-        document.getElementById('csv-file-input').value = '';
-        document.getElementById('drop-label').textContent = '點擊選擇或拖曳 CSV 檔案到這裡';
+        fileInput.value = '';
+        document.getElementById('drop-label').textContent = currentDropLabel;
         document.getElementById('drop-label').className = 'text-sm text-slate-500';
         document.getElementById('import-submit-btn').disabled = true;
         // Reset radio
         document.querySelector('input[name="import_mode"][value="skip"]').checked = true;
         document.getElementById('import-modal').classList.remove('hidden');
+    }
+
+    function openImportAllModal() {
+        openImportModal(
+            '全部資料', '{{ url_for("import_all") }}', true,
+            '請上傳「全部匯出」產生的 .xlsx 檔案，將依序匯入業務代表、專案種類、參與人員、專案、工作紀錄。',
+            true,
+            {
+                fieldName: 'xlsx_file',
+                accept: '.xlsx',
+                fileTypeLabel: 'Excel',
+                wipeTitle: '匯入前清空整個資料庫',
+                wipeDesc: '會先自動備份資料庫，再清空所有資料（專案、工作紀錄、業務代表、參與人員、專案種類），然後匯入這份 Excel。此操作無法復原（可從備份還原）。',
+                wipeConfirm: '確定要先清空「整個資料庫」，再匯入這份 Excel 嗎？\n\n目前的資料會先自動備份，但清空動作本身無法復原（需從備份手動還原）。'
+            }
+        );
     }
 
     function closeImportModal() {
@@ -586,7 +627,7 @@
     document.getElementById('import-form').addEventListener('submit', function (e) {
         const wipeCheckbox = document.getElementById('wipe-before-import-checkbox');
         if (wipeCheckbox && wipeCheckbox.checked) {
-            if (!confirm('確定要先清空「所有」工作紀錄，再匯入這份 CSV 嗎？\n\n目前的資料會先自動備份，但清空動作本身無法復原（需從備份手動還原）。')) {
+            if (!confirm(currentWipeConfirmMsg)) {
                 e.preventDefault();
             }
         }
@@ -600,7 +641,7 @@
             label.className = 'text-sm font-medium text-primary';
             btn.disabled = false;
         } else {
-            label.textContent = '點擊選擇或拖曳 CSV 檔案到這裡';
+            label.textContent = currentDropLabel;
             label.className = 'text-sm text-slate-500';
             btn.disabled = true;
         }

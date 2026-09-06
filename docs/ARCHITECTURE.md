@@ -72,6 +72,7 @@ Admin, session-gated (`admin.py`, `manage.py`):
 | `/api/export-personnel`, `/api/import-personnel` | personnel CSV |
 | `/api/export-categories`, `/api/import-categories` | categories CSV |
 | `GET /api/export-all` | whole DB as one .xlsx, one sheet per table (admin-auth gated) |
+| `POST /api/import-all` | whole DB from that .xlsx: imports sheets in order (reps → categories → personnel → projects → tasks) so name references resolve; `skip`/`overwrite` mode, optional wipe-all-tables-first (auto-backs up) |
 | `GET /api/backup-download`; `POST /api/backup-now`, `/api/backup-restore` | DB backup |
 
 ## Design decisions that are NOT obvious from a quick read
@@ -99,6 +100,12 @@ Admin, session-gated (`admin.py`, `manage.py`):
   link (e.g. from the timeline's 離職 badge) since that lookup isn't filtered.
 - CSV import auto-detects UTF-8 / UTF-8-BOM / BIG5 (Excel compatibility); import
   modes are `skip` (skip duplicates) or `overwrite`.
+- `import_all` (whole-DB `.xlsx` import) reuses the same per-table skip/overwrite
+  logic as the individual CSV importers, just reading from workbook sheets
+  (`_sheet_rows()`) instead of `csv.DictReader`. Sheet order matters: reps and
+  categories first, then personnel, then projects (auto-creates any missing
+  rep/category, same as `import_db`), then tasks last since each task row
+  resolves its project by name.
 - Avatar upload: PNG/JPG/GIF/WebP only, max 5 MB.
 - Admin auth: `session['db_admin_auth']`; password from `DB_ADMIN_PASSWORD`.
   `SECRET_KEY` and `DB_ADMIN_PASSWORD` have NO defaults — `app.py` raises at

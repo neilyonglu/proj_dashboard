@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime
 
 from flask import render_template, request, redirect, url_for, flash, session, send_file, Response
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from ..extensions import db
 from ..models import Project, Task, Personnel, Representative, Category
 from ..helpers import backup_database, ensure_task_columns, BACKUP_KEEP
@@ -186,6 +186,225 @@ def register(app):
         filename = f"proj_dashboard_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         return send_file(buf, as_attachment=True, download_name=filename,
                          mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    @app.route('/api/import-all', methods=['POST'])
+    def import_all():
+        guard = _require_auth()
+        if guard:
+            flash('未授權，請先登入', 'error')
+            return redirect(url_for('manage_db_login'))
+
+        file = request.files.get('xlsx_file')
+        if not file or file.filename == '':
+            flash('請選擇 Excel 檔案 (.xlsx)', 'error')
+            return redirect(url_for('manage_db'))
+        if not file.filename.lower().endswith('.xlsx'):
+            flash('檔案格式錯誤，請上傳「全部匯出」產生的 .xlsx 檔', 'error')
+            return redirect(url_for('manage_db'))
+
+        mode = request.form.get('import_mode', 'skip')
+        wipe_before_import = request.form.get('wipe_before_import') == '1'
+
+        try:
+            wb = load_workbook(file, data_only=True)
+        except Exception as e:
+            flash(f'無法讀取 Excel 檔案：{str(e)}', 'error')
+            return redirect(url_for('manage_db'))
+
+        def _sheet_rows(title):
+            if title not in wb.sheetnames:
+                return []
+            rows = list(wb[title].iter_rows(values_only=True))
+            if not rows:
+                return []
+            headers = [str(h).strip() if h is not None else '' for h in rows[0]]
+            result = []
+            for row in rows[1:]:
+                if row is None or all(c is None for c in row):
+                    continue
+                result.append({headers[i]: ('' if row[i] is None else str(row[i]).strip())
+                               for i in range(len(headers)) if i < len(row)})
+            return result
+
+        def _opt_float(s):
+            s = (s or '').strip()
+            try:
+                return float(s) if s else None
+            except ValueError:
+                return None
+
+        try:
+            if wipe_before_import:
+                backup_database(reason='pre_full_wipe')
+                Task.query.delete()
+                Project.query.delete()
+                Representative.query.delete()
+                Personnel.query.delete()
+                Category.query.delete()
+                db.session.commit()
+                log_action(request.remote_addr, '全部匯入前清空整個資料庫')
+
+            counts = {}
+            errors = []
+
+            # 1. Representatives
+            n_add = n_skip = 0
+            for row in _sheet_rows('業務代表'):
+                name = row.get('名稱', '').strip()
+                if not name:
+                    continue
+                if Representative.query.filter_by(name=name).first():
+                    n_skip += 1
+                else:
+                    db.session.add(Representative(name=name))
+                    n_add += 1
+            db.session.commit()
+            counts['業務代表'] = (n_add, n_skip)
+
+            # 2. Categories
+            n_add = n_skip = 0
+            for row in _sheet_rows('專案種類'):
+                name = row.get('種類名稱', '').strip()
+                if not name:
+                    continue
+                if Category.query.filter_by(name=name).first():
+                    n_skip += 1
+                else:
+                    db.session.add(Category(name=name))
+                    n_add += 1
+            db.session.commit()
+            counts['專案種類'] = (n_add, n_skip)
+
+            # 3. Personnel
+            n_add = n_skip = 0
+            for row in _sheet_rows('參與人員'):
+                name = row.get('系統代號', '').strip()
+                if not name:
+                    continue
+                display_name = row.get('顯示名稱', '').strip() or None
+                existing = Personnel.query.filter_by(name=name).first()
+                if existing:
+                    if mode == 'overwrite':
+                        existing.display_name = display_name
+                        n_add += 1
+                    else:
+                        n_skip += 1
+                else:
+                    db.session.add(Personnel(name=name, display_name=display_name))
+                    n_add += 1
+            db.session.commit()
+            counts['參與人員'] = (n_add, n_skip)
+
+            # 4. Projects
+            n_add = n_skip = 0
+            for i, row in enumerate(_sheet_rows('專案'), start=2):
+                name = row.get('專案名稱', '').strip()
+                if not name:
+                    continue
+                status = row.get('狀態', '').strip()
+                rep = row.get('業務代表', '').strip()
+                equipment = row.get('設備', '').strip() or None
+                category = row.get('專案種類', '').strip()
+                description = row.get('內容敘述', '').strip() or None
+                notes = row.get('備註', '').strip() or None
+                start_str = row.get('起始日', '').strip()
+                end_str = row.get('結束日', '').strip()
+
+                try:
+                    start_date = datetime.strptime(start_str, '%Y/%m/%d').date() if start_str else None
+                    end_date = datetime.strptime(end_str, '%Y/%m/%d').date() if end_str else None
+                except ValueError:
+                    errors.append(f'專案表第 {i} 行「{name}」日期格式錯誤（需為 YYYY/MM/DD）')
+                    continue
+
+                if not start_date:
+                    errors.append(f'專案表第 {i} 行「{name}」缺少起始日，已略過')
+                    continue
+
+                existing = Project.query.filter_by(name=name).first()
+                if existing:
+                    if mode == 'skip':
+                        n_skip += 1
+                        continue
+                    existing.status = status
+                    existing.rep = rep
+                    existing.equipment = equipment
+                    existing.category = category
+                    existing.description = description
+                    existing.start_date = start_date
+                    existing.end_date = end_date
+                    existing.notes = notes
+                    n_add += 1
+                else:
+                    db.session.add(Project(name=name, status=status, rep=rep, equipment=equipment,
+                                           category=category, description=description,
+                                           start_date=start_date, end_date=end_date, notes=notes))
+                    n_add += 1
+
+                if rep and not Representative.query.filter_by(name=rep).first():
+                    db.session.add(Representative(name=rep))
+                if category and not Category.query.filter_by(name=category).first():
+                    db.session.add(Category(name=category))
+            db.session.commit()
+            counts['專案'] = (n_add, n_skip)
+
+            # 5. Tasks (must run after projects so project names resolve)
+            n_add = n_skip = 0
+            seen = set(
+                (t.project_id, t.personnel, t.date, t.work_days, t.day_hours,
+                 t.overtime_hours, t.night_hours, t.description, t.notes)
+                for t in Task.query.all())
+            for i, row in enumerate(_sheet_rows('工作紀錄'), start=2):
+                proj_name = row.get('所屬專案', '').strip()
+                personnel = row.get('人員', '').strip()
+                description = row.get('工作描述', '').strip()
+                notes = row.get('備註', '').strip() or None
+                if not proj_name or not personnel or not description:
+                    errors.append(f'工作紀錄表第 {i} 行缺少必填欄位，已略過')
+                    continue
+                project = Project.query.filter_by(name=proj_name).first()
+                if not project:
+                    errors.append(f'工作紀錄表第 {i} 行找不到專案「{proj_name}」，已略過')
+                    continue
+                date_str = row.get('日期', '').strip()
+                work_days_s = row.get('工作天數', '').strip()
+                try:
+                    task_date = datetime.strptime(date_str, '%Y/%m/%d').date() if date_str else None
+                    work_days = float(work_days_s) if work_days_s else 0.0
+                except ValueError:
+                    errors.append(f'工作紀錄表第 {i} 行日期或工作天數格式錯誤，已略過')
+                    continue
+                day_hours = _opt_float(row.get('日班時數', ''))
+                overtime_hours = _opt_float(row.get('加班時數', ''))
+                night_hours = _opt_float(row.get('夜班時數', ''))
+                sig = (project.id, personnel, task_date, work_days, day_hours,
+                       overtime_hours, night_hours, description, notes)
+                if sig in seen:
+                    n_skip += 1
+                    continue
+                seen.add(sig)
+                db.session.add(Task(project_id=project.id, personnel=personnel, date=task_date,
+                                    work_days=work_days, day_hours=day_hours,
+                                    overtime_hours=overtime_hours, night_hours=night_hours,
+                                    description=description, notes=notes))
+                n_add += 1
+            db.session.commit()
+            counts['工作紀錄'] = (n_add, n_skip)
+
+            summary = '、'.join(f'{k} +{v[0]}/略過{v[1]}' for k, v in counts.items())
+            msg = f'✅ 全部匯入完成！{summary}'
+            if errors:
+                msg += f'（{len(errors)} 筆錯誤）'
+            log_action(request.remote_addr, '全部匯入 Excel',
+                       f'mode={mode}, wipe={wipe_before_import}, ' +
+                       '; '.join(f'{k}={v[0]}/{v[1]}' for k, v in counts.items()))
+            flash(msg, 'success')
+            for err in errors[:5]:
+                flash(err, 'error')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'匯入失敗：{str(e)}', 'error')
+        return redirect(url_for('manage_db'))
 
     # ── Projects CSV ──────────────────────────────────────────────────────────
 
